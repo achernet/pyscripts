@@ -158,11 +158,11 @@ class PypiSearchResult(NamedObject):
         The age, scaled by rank, is 116.8 - 45506 / (397.7 + age).
         """
         return 116.8 - (45506.0 / (self.age + 397.7))
-    
+
     @property
     def download_rate(self):
         return max(self.download_counts[1] / 7.0, self.download_counts[2] / 30.0)
-    
+
     @property
     def scaled_download_rate(self):
         """
