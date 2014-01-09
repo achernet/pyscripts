@@ -17,8 +17,8 @@ import sys
 
 logging.getLogger().setLevel(logging.DEBUG)
 
+ARIA2_CA_CERTIFICATE_PATH = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 ARIA2_DOWNLOAD_COMPLETE_RGX = re.compile("Download complete:\\s+(?P<path>.*)$")
-
 ARIA2C_OPTIONS = {"no-conf": True,
                   "timeout": 30,
                   "summary-interval": 2,
@@ -38,7 +38,9 @@ ARIA2C_OPTIONS = {"no-conf": True,
                   "remote-time": True,
                   "http-accept-gzip": True,
                   "enable-http-pipelining": True,
-                  "enable-http-keep-alive": False}
+                  "enable-http-keep-alive": False,
+                  "ca-certificate": ARIA2_CA_CERTIFICATE_PATH,
+                  "check-certificate": os.path.exists(ARIA2_CA_CERTIFICATE_PATH)}
 
 DOWNLOAD_COUNT_XPATH = "//ul[@class=\"nodot\"][li[strong[starts-with(text(), \"Downloads\")]]]/li/span/text()"
 LAST_UPDATE_XPATH = "//table[@class=\"list\"]/tr[@class]/td[4]/text()"
