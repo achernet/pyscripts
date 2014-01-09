@@ -1,3 +1,7 @@
+# CSV files (they contain the results of pypi_pip_search.py)
+*.csv
+
+# Compiled Python files
 *.py[cod]
 
 # C extensions
