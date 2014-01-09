@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Main module for running "new and improved" python package searches with better metrics.
 
