@@ -164,7 +164,7 @@ class PypiSearchResult(NamedObject):
 
     @property
     def download_rate(self):
-        return max(self.download_counts[1] / 7.0, self.download_counts[2] / 30.0)
+        return max(self.download_counts[1] / 7.0, self.download_counts[2] / 30.0) if self.download_counts else -1
 
     @property
     def scaled_download_rate(self):
