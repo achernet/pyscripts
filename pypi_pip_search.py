@@ -285,20 +285,19 @@ class DownloadMapper(object):
         self.paths = []
         self.backups_needed = []
 
-    def get_proper_dirname(self, ntf_name):
+    def get_proper_path(self, file_path):
         """
-        Get the "proper" format for the directory in which C{ntf_name} is/will be saved. Normally this is just
-        os.path.dirname(). However, aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
-
-        @param ntf_name: The name of the temporary input file being generated and saved
-        @type ntf_name: str or unicode
-        @return: The parent directory for C{ntf_name}, formatted so that aria2c(.exe) will recognize it
+        Get the "proper" format for C{file_path} by removing Cygwin-specific formatting, if it exists.
+        This is necessary because aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
+        
+        @param file_path: The path to convert if deemed necessary
+        @type file_path: str or unicode
+        @return: The converted file path
         @rtype: str or unicode
         """
-        dir_name = os.path.dirname(ntf_name)
         if "cygwin" in sys.platform.lower():
-            dir_name = dir_name.replace("/cygdrive/", "").replace("/", ":/", 1).replace("/", "\\")
-        return dir_name
+            return file_path.replace("/cygdrive/", "").replace("/", ":/", 1).replace("/", "\\")
+        return file_path
 
     def run_aria2(self, max_age_days, aria2c_path):
         """
@@ -317,7 +316,7 @@ class DownloadMapper(object):
 
         # Make a (temporary) input file in the default TEMP directory, populating it with each URL and output path.
         with NamedTemporaryFile(delete=False) as ntf:
-            ntf_dir = self.get_proper_dirname(ntf.name)
+            ntf_dir = self.get_proper_path(os.path.dirname(ntf.name))
             for result in self.nrmap.values():
 
                 # Skip results that have already been downloaded recently.
@@ -336,7 +335,7 @@ class DownloadMapper(object):
         aria2_cmd = sh.Command(aria2c_path)
 
         # Run and observe the above aria2c executable, reporting download progress to the appropriate logger.
-        local_aria2c_options = {"input-file": ntf.name,
+        local_aria2c_options = {"input-file": self.get_proper_path(ntf.name),
                                 "dir": ntf_dir,
                                 "max-download-result": len(self.nrmap)}
         aria2_cmd = aria2_cmd.bake(ARIA2C_OPTIONS).bake(local_aria2c_options)
