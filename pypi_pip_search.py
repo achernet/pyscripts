@@ -285,11 +285,14 @@ class DownloadMapper(object):
         self.paths = []
         self.backups_needed = []
 
-    def run_aria2(self, max_age_days):
+    def run_aria2(self, max_age_days, aria2c_path):
         """
         Run aria2c to execute all the downloads and save their file paths.
+
         @param max_age_days: The maximum age a file should be in order to be considered "recent" (and skipped over)
         @type max_age_days: float
+        @param aria2c_path: The path to the aria2c(.exe) executable, or None to search for it in the PATH environment
+        @type aria2c_path: str or None
         """
         if self.paths:
             log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
@@ -297,7 +300,7 @@ class DownloadMapper(object):
             return
         total = len(self.nrmap)
 
-        # make temporary input file
+        # Make a (temporary) input file in the default TEMP directory, populating it with each URL and output path.
         with NamedTemporaryFile(delete=False) as ntf:
             ntf_dir = os.path.dirname(ntf.name)
             for result in self.nrmap.values():
@@ -308,11 +311,19 @@ class DownloadMapper(object):
                 ntf.write(result.to_aria2_input_entry())
         logging.info("aria2c input file saved to %s", ntf.name)
 
-        # run the command
+        # If a path to aria2c(.exe) was passed in, try to use it. Otherwise, try to resolve that path using the
+        # current environment (specifically, the PATH variable).
+        aria2c_path = aria2c_path or sh.resolve_program("aria2c")
+        if aria2c_path is None:
+            logging.error("aria2c is missing from the current configuration!")
+            return
+        aria2_cmd = sh.Command(aria2c_path)
+
+        # Run and observe the above aria2c executable, reporting download progress to the appropriate logger.
         local_aria2c_options = {"input-file": ntf.name,
                                 "dir": ntf_dir,
                                 "max-download-result": len(self.nrmap)}
-        aria2_cmd = sh.Command("aria2c").bake(ARIA2C_OPTIONS).bake(local_aria2c_options)
+        aria2_cmd = aria2_cmd.bake(ARIA2C_OPTIONS).bake(local_aria2c_options)
         logging.info("Command to execute: %s", aria2_cmd)
         try:
             for line in aria2_cmd(_iter=True, _ok_code=1, _err_to_out=True, _tty_out=False, _bg=True):
@@ -417,7 +428,7 @@ def search_packages(search_term, collect_stats=True, backup_search=False,
     if not collect_stats:
         return initial_results
     stats_downloader = DownloadMapper(initial_results)
-    stats_downloader.run_aria2(max_age_days)
+    stats_downloader.run_aria2(max_age_days, aria2c_path)
     stats_downloader.update_objects()
     if not backup_search:
         return stats_downloader.named_objects
