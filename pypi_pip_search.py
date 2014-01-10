@@ -393,7 +393,8 @@ def query_initial_packages(search_term):
     return results
 
 
-def search_packages(search_term, collect_stats=True, backup_search=False, max_age_days=0.5):
+def search_packages(search_term, collect_stats=True, backup_search=False,
+                    max_age_days=0.5, aria2c_path=None):
     """
     Search for packages matching C{search_term}, optionally collecting stats
     and/or running backup updates for any packages whose age was not determined
@@ -407,6 +408,8 @@ def search_packages(search_term, collect_stats=True, backup_search=False, max_ag
     @type backup_search: bool
     @param max_age_days: The maximum days of age files should be
     @type max_age_days: float
+    @param aria2c_path: The path to the aria2c executable
+    @type aria2c_path: str or None
     @return: The resulting search results
     @rtype: list[PypiSearchResult]
     """
@@ -479,9 +482,15 @@ def main(args):
                         dest="output_file",
                         type=str,
                         help="The output file")
+    parser.add_argument("-p", "--path-to-aria2c",
+                        dest="aria2c_path",
+                        type=str,
+                        help="The path to aria2c(.exe) if not in current PATH environment")
+    parser.set_defaults(aria2c_path=None)
     parser_ns = parser.parse_args(args)
     packages = search_packages(parser_ns.search_term, parser_ns.collect_stats,
-                               parser_ns.backup_search, parser_ns.max_age_days)
+                               parser_ns.backup_search, parser_ns.max_age_days,
+                               parser_ns.aria2c_path)
     packages.sort()
     bad_indexes = []
     for i, pkg in enumerate(packages):
