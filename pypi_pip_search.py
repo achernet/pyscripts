@@ -285,6 +285,21 @@ class DownloadMapper(object):
         self.paths = []
         self.backups_needed = []
 
+    def get_proper_dirname(self, ntf_name):
+        """
+        Get the "proper" format for the directory in which C{ntf_name} is/will be saved. Normally this is just
+        os.path.dirname(). However, aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
+
+        @param ntf_name: The name of the temporary input file being generated and saved
+        @type ntf_name: str or unicode
+        @return: The parent directory for C{ntf_name}, formatted so that aria2c(.exe) will recognize it
+        @rtype: str or unicode
+        """
+        dir_name = os.path.dirname(ntf_name)
+        if "cygwin" in sys.platform.lower():
+            dir_name = dir_name.replace("/cygdrive/", "").replace("/", ":/", 1).replace("/", "\\")
+        return dir_name
+
     def run_aria2(self, max_age_days, aria2c_path):
         """
         Run aria2c to execute all the downloads and save their file paths.
@@ -302,14 +317,15 @@ class DownloadMapper(object):
 
         # Make a (temporary) input file in the default TEMP directory, populating it with each URL and output path.
         with NamedTemporaryFile(delete=False) as ntf:
-            ntf_dir = os.path.dirname(ntf.name)
+            ntf_dir = self.get_proper_dirname(ntf.name)
             for result in self.nrmap.values():
+
                 # Skip results that have already been downloaded recently.
                 if result.has_recent_download(ntf_dir, max_age_days):
                     self.paths.append(os.path.join(ntf_dir, result.name))
                     continue
                 ntf.write(result.to_aria2_input_entry())
-        logging.info("aria2c input file saved to %s", ntf.name)
+        logging.info("aria2c input file saved to %r (dir: %r)", ntf.name, ntf_dir)
 
         # If a path to aria2c(.exe) was passed in, try to use it. Otherwise, try to resolve that path using the
         # current environment (specifically, the PATH variable).
