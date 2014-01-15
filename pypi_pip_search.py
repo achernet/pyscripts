@@ -41,7 +41,7 @@ ARIA2C_OPTIONS = {"no-conf": True,
                   "enable-http-pipelining": True,
                   "enable-http-keep-alive": False,
                   "ca-certificate": ARIA2_CA_CERTIFICATE_PATH,
-                  "check-certificate": os.path.exists(ARIA2_CA_CERTIFICATE_PATH)}
+                  "check-certificate": "false"}  # os.path.exists(ARIA2_CA_CERTIFICATE_PATH)}
 
 DOWNLOAD_COUNT_XPATH = "//ul[@class=\"nodot\"][li[strong[starts-with(text(), \"Downloads\")]]]/li/span/text()"
 LAST_UPDATE_XPATH = "//table[@class=\"list\"]/tr[@class]/td[4]/text()"
@@ -296,7 +296,8 @@ class DownloadMapper(object):
         @rtype: str or unicode
         """
         if "cygwin" in sys.platform.lower():
-            return file_path.replace("/cygdrive/", "").replace("/", ":/", 1).replace("/", "\\")
+            file_path = sh.cygpath("-w", file_path).stdout.strip()
+            print file_path
         return file_path
 
     def run_aria2(self, max_age_days, aria2c_path):
