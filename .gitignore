@@ -1,3 +1,7 @@
+# Dependent files
+aria2c.exe
+ca-bundle.crt
+
 # CSV files (they contain the results of pypi_pip_search.py)
 *.csv
 
