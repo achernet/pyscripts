@@ -4,10 +4,11 @@ Main module for running "new and improved" python package searches with better m
 
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from lxml.html import etree, HTMLParser
 from tempfile import NamedTemporaryFile
 from total_ordering import total_ordering
+import csv
 import dateutil.parser
 import logging
 import os
@@ -268,6 +269,19 @@ class PypiSearchResult(NamedObject):
         """
         return "\"{0.name}\",\"{0.version}\",{0.weight},{0.download_rate},{0.age}".format(self)
 
+    @classmethod
+    def from_csv(cls, csv_line, ref_date=None):
+        """
+        Given a line from a CSV file, read it and return a basic PypiSearchResult object.
+        """
+        ref_date = ref_date or datetime.utcnow()
+        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, basestring) else csv_line
+        link = "https://pypi.python.org/pypi/{0[0]}/{0[1]}".format(csv_parts)
+        weight = int(csv_parts[2])
+        rates = [float(csv_parts[3]), float(csv_parts[3]) * 7.0, float(csv_parts[3]) * 30.0]
+        start_date = ref_date - timedelta(days=int(csv_parts[4]))
+        return PypiSearchResult(link, weight, "", rates, start_date)
+
 
 class DownloadMapper(object):
     """
@@ -289,7 +303,7 @@ class DownloadMapper(object):
         """
         Get the "proper" format for C{file_path} by removing Cygwin-specific formatting, if it exists.
         This is necessary because aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
-        
+
         @param file_path: The path to convert if deemed necessary
         @type file_path: str or unicode
         @return: The converted file path
@@ -452,25 +466,38 @@ def search_packages(search_term, collect_stats=True, backup_search=False,
     return stats_downloader.named_objects
 
 
-def make_gui():
-    gui_kw = {
-        "VL": {
-            "HL": [
-                {
-                    "type": "label",
-                    "text": "Collect Stats?",
-                    "tooltip": ("Check to run statistics collection after the initial search.\n"
-                                "Required for computing the download rate and last update age of packages.")
-                },
-                {
-                    "type": "checkbox",
-                    "checked": True,
-                    "action": "collect_stats"
-                }
+class OutputFile(object):
 
-            ]
-        }
-    }
+    def __init__(self, search_term):
+        self.search_term = search_term
+
+    def __repr__(self):
+        return "{0.__class__.__name__}({0.search_term})".format(self)
+
+    def __str__(self):
+        return repr(self)
+
+    @property
+    def file_name(self):
+        return "{0.search_term}.csv".format(self)
+
+    @property
+    def path(self):
+        return os.path.abspath(self.file_name)
+
+    @property
+    def ref_date(self):
+        try:
+            file_stats = os.stat(self.path)
+            cm_time = max(file_stats.st_mtime, file_stats.st_ctime)
+        except OSError:
+            cm_time = -1
+        return datetime.utcfromtimestamp(cm_time)
+
+    @property
+    def age(self):
+        age_td = datetime.utcnow() - self.ref_date
+        return age_td.total_seconds() / 86400.0
 
 
 def main(args):
@@ -505,35 +532,28 @@ def main(args):
                         type=float,
                         help="Max days to consider recent when downloading already-existing files")
     parser.set_defaults(max_age_days=0.5)
-    parser.add_argument("-o", "--output_file",
-                        dest="output_file",
-                        type=str,
-                        help="The output file")
     parser.add_argument("-p", "--path-to-aria2c",
                         dest="aria2c_path",
                         type=str,
                         help="The path to aria2c(.exe) if not in current PATH environment")
     parser.set_defaults(aria2c_path=None)
     parser_ns = parser.parse_args(args)
-    packages = search_packages(parser_ns.search_term, parser_ns.collect_stats,
-                               parser_ns.backup_search, parser_ns.max_age_days,
-                               parser_ns.aria2c_path)
-    packages.sort()
-    bad_indexes = []
-    for i, pkg in enumerate(packages):
-        if pkg.age is None:
-            logging.warning("The age of package %r is unknown!", pkg.name)
-            bad_indexes.append(i)
-            continue
-    bad_indexes.sort(reverse=True)
-    for index in bad_indexes:
-        packages.pop(index)
-    out_path = "{0}.csv".format(parser_ns.output_file or parser_ns.search_term)
-    logging.info("Saving CSV entries to {0}".format(os.path.abspath(out_path)))
-    with open(out_path, "w") as f:
-        for package in packages:
-            f.write(package.to_csv())
-            f.write(os.linesep)
+
+    out_obj = OutputFile(parser_ns.search_term)
+    if out_obj.age < parser_ns.max_age_days:
+        with open(out_obj.path, 'r') as f:
+            csv_lines = f.read().splitlines()
+        packages = [PypiSearchResult.from_csv(line, ref_date=out_obj.ref_date) for line in csv_lines]
+    else:
+        packages = search_packages(parser_ns.search_term, parser_ns.collect_stats,
+                                   parser_ns.backup_search, parser_ns.max_age_days,
+                                   parser_ns.aria2c_path)
+        packages.sort()
+        logging.info("Saving CSV entries to %s", out_obj.path)
+        with open(out_obj.path, "w") as f:
+            for package in packages:
+                f.write(package.to_csv())
+                f.write(os.linesep)
 
 
 if __name__ == "__main__":
