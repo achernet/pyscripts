@@ -48,9 +48,10 @@ class GuiQuery(object):
         self.stats_var.trace("w", self.on_stats_checked)
         self.backup_var = tk.IntVar(self.options_frame)
         self.backup_var.trace("w", self.on_backup_checked)
+        self.days_var = tk.StringVar(self.days_frame)
 
-        self.label = tk.Label(self.query_frame, text="Search Query:")
-        self.label.pack(side=Tkc.LEFT)
+        self.search_label = tk.Label(self.query_frame, text="Search Query:")
+        self.search_label.pack(side=Tkc.LEFT)
         self.entry = tk.Entry(self.query_frame, textvariable=self.query_var, bg="white")
         self.entry.bind("<Return>", self.run_query)
         self.entry.pack(side=Tkc.LEFT, expand=True, fill=Tkc.X)
@@ -64,7 +65,13 @@ class GuiQuery(object):
         self.backup.pack(side=Tkc.LEFT, expand=True, fill=Tkc.X)
         self.stats.select()
 
-        self.max_age = GuiMaxAge(self.days_frame)
+        self.age_label = tk.Label(self.days_frame, text="Days to cache package information:")
+        self.age_label.pack(side=Tkc.LEFT)
+        self.max_age = tk.Spinbox(self.days_frame, from_=0.0, to=30.0, increment=0.5, format="%0.3f",
+                                  textvariable=self.days_var, command=(self.on_max_age_change, "%s", "%P"),
+                                  validate=Tkc.ALL, validatecommand=(self.on_max_age_validate, "%s", "%P"))
+        self.max_age.pack(side=Tkc.LEFT)
+        self.max_age.config(state=Tkc.DISABLED)
 
     @property
     def query(self):
@@ -80,7 +87,7 @@ class GuiQuery(object):
 
     @property
     def max_cache_age(self):
-        return self.max_age.days
+        return float(self.days_var.get())
 
     def run_query(self, event=None):
         query_config = {"query": self.query,
@@ -108,6 +115,12 @@ class GuiQuery(object):
         var = var or self.backup_var
         do_backup = self.should_do_backup
         print "Backup search: {0}".format(self.backup_var.get())
+
+    def on_max_age_change(self, old_value, new_value):
+        print "Changing max age from {0} to {1}".format(old_value, new_value)
+
+    def on_max_age_validate(self, old_value, new_value):
+        print "Validating max age ({0} -> {1})".format(old_value, new_value)
 
 
 class GuiLogger(logging.Handler):
