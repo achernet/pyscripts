@@ -97,17 +97,18 @@ class PypiSearchResult(NamedObject):
     __slots__ = ("link", "weight", "summary", "download_counts", "last_update")
 
     def __repr__(self):
-        repr_fmt = "<{0.name}/{0.version}, weight={0.weight}, rate={0.download_rate:.2f}, age={0.age}>"
+        repr_fmt = ("<{0.name}/{0.version}, weight={0.weight}, rate={0.download_rate:.2f}, age={0.age}, "
+                    "score={0.score:0.3f}>")
         return repr_fmt.format(self)
 
     def __hash__(self):
-        return hash((self.link, self.weight))
+        return hash((self.score, self.link))
 
     def __eq__(self, other):
-        return (self.link, self.weight) == (other.link, other.weight)
+        return (self.score, self.link) == (other.score, other.link)
 
     def __lt__(self, other):
-        return (self.weight, self.link) < (other.weight, other.link)
+        return (self.score, self.link) < (other.score, other.link)
 
     def __init__(self, link, weight, summary, download_counts=None, last_update=None):
         self.link = link
@@ -174,6 +175,21 @@ class PypiSearchResult(NamedObject):
         The overall download rate, scaled by rank, is 98.21 - 742 / (6.404 + rate).
         """
         return 98.21 - (742 / (self.download_rate + 6.404))
+
+    @property
+    def scaled_weight(self):
+        return (self.weight - 1) * 0.1
+
+    @property
+    def score(self):
+        """
+        The total score of this search result, scaled by category. The weight (according to PyPI) is worth 2,
+        the age is worth 3, and the download rate is worth 5.
+
+        @return: The total score for this search result
+        @rtype: float
+        """
+        return self.scaled_weight * 2.0 + self.scaled_age * 3.0e-2 + self.scaled_download_rate * 5.0e-2
 
     def has_recent_download(self, search_dir, max_days):
         """
@@ -268,7 +284,8 @@ class PypiSearchResult(NamedObject):
         """
         Return a line of CSV for this result.
         """
-        return "\"{0.name}\",\"{0.version}\",{0.weight},{0.download_rate},{0.age}".format(self)
+        csv_fmt = "\"{0.name}\",\"{0.version}\",{0.weight},{0.download_rate:0.2f},{0.age},{0.score:0.3f}"
+        return csv_fmt.format(self)
 
     @classmethod
     def from_csv(cls, csv_line, ref_date=None):
