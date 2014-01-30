@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from total_ordering import total_ordering
 import csv
 import dateutil.parser
+import json
 import logging
 import os
 import re
@@ -283,6 +284,48 @@ class PypiSearchResult(NamedObject):
         return PypiSearchResult(link, weight, "", rates, start_date)
 
 
+class PypiJsonSearchResult(PypiSearchResult):
+
+    @property
+    def version(self):
+        """
+        @return: The package version
+        @rtype: basestring
+        """
+        return self.link.split("/")[-2]
+
+    @property
+    def name(self):
+        """
+        @return: The name of this named object
+        @rtype: basestring
+        """
+        return self.link.split("/")[-3]
+
+    @classmethod
+    def from_csv(cls, csv_line, ref_date=None):
+        ref_date = ref_date or datetime.utcnow()
+        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, basestring) else csv_line
+        link = "https://pypi.python.org/pypi/{0[0]}/{0[1]}/json".format(csv_parts)
+        weight = int(csv_parts[2])
+        rates = [float(csv_parts[3]), float(csv_parts[3]) * 7.0, float(csv_parts[3]) * 30.0]
+        start_date = ref_date - timedelta(days=int(csv_parts[4]))
+        return PypiJsonSearchResult(link, weight, "", rates, start_date)
+
+    def apply_update(self, new_content):
+        json_dict = json.loads(new_content)
+        dl_info = json_dict["info"]["downloads"]
+        self.download_counts = [float(dl_info[k]) for k in ["last_day", "last_week", "last_month"]]
+        upload_time_strs = [url_info["upload_time"] for url_info in json_dict["urls"]]
+        upload_times = [dateutil.parser.parse(up_time, ignoretz=True) for up_time in upload_time_strs]
+        if upload_times:
+            self.last_update = max(upload_times)
+            return True
+        else:
+            self.last_update = None
+            return False
+
+
 class DownloadMapper(object):
     """
     Class to handle the parallel downloading of named objects.
@@ -427,9 +470,9 @@ def query_initial_packages(search_term):
     result_tags = result_tree.xpath(SEARCH_RESULTS_XPATH)
     results = []
     for lxml_element in result_tags:
-        result_obj = PypiSearchResult(link=lxml_element[0][0].get("href"),
-                                      weight=int(lxml_element[1].text),
-                                      summary=lxml_element[2].text)
+        result_obj = PypiJsonSearchResult(link="{0}/json".format(lxml_element[0][0].get("href")),
+                                          weight=int(lxml_element[1].text),
+                                          summary=lxml_element[2].text)
         results.append(result_obj)
     return results
 
