@@ -1,9 +1,12 @@
 import copy
 import csv
+import logging
 import Tkinter as tk
 import Tkconstants as Tkc
 import tkFileDialog as Tkfc
 import tkFont as Tkf
+
+logging.getLogger().setLevel(logging.DEBUG)
 
 
 class MultiListbox(tk.Frame):
@@ -98,16 +101,23 @@ class MultiListbox(tk.Frame):
 
     def _select(self, y):
         row = self.lists[0].nearest(y)
+        logging.info("Selecting Y point %s (got row %s)", y, row)
+        return self._select_row(row)
+
+    def _select_row(self, row):
+        logging.info("Selecting row %d", row)
         self.selection_clear(0, Tkc.END)
         self.selection_set(row)
         return "break"
 
     def _button2(self, x, y):
+        logging.info("Button 2 at (%d, %d)", x, y)
         for list_widget in self.lists:
             list_widget.scan_mark(x, y)
         return "break"
 
     def _b2motion(self, x, y):
+        logging.info("B2 Motion to (%d, %d)", x, y)
         for list_widget in self.lists:
             list_widget.scan_dragto(x, y)
         return "break"
