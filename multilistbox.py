@@ -61,11 +61,11 @@ class MultiListbox(tk.Frame):
         elif direction == 1:
             originating_button.config(text="[+] {0}".format(button_label))
             table_data.sort(key=lambda obj: obj[column], reverse=False)
-        else:
+        else:  # direction == -1
             originating_button.config(text="[-] {0}".format(button_label))
             table_data.sort(key=lambda obj: obj[column], reverse=True)
 
-        # Clear and refilll the widget.
+        # Clear and refill the widget.
         self.delete(0, Tkc.END)
         for row in xrange(row_count):
             self.insert(Tkc.END, table_data[row])
