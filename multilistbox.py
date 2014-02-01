@@ -59,6 +59,12 @@ class MultiListbox(tk.Frame):
         scroll_bar.pack(expand=Tkc.YES, fill=Tkc.Y)
         self.lists[0]["yscrollcommand"] = scroll_bar.set
 
+        # Configure scrolling by arrow keys and Page Up/Down.
+        self.bind_all("<Up>", lambda e, s=self: s._scroll("scroll", "-1", "units", select=True))
+        self.bind_all("<Down>", lambda e, s=self: s._scroll("scroll", "1", "units", select=True))
+        self.bind_all("<Next>", lambda e, s=self: s._scroll("scroll", "1", "pages", select=True))
+        self.bind_all("<Prior>", lambda e, s=self: s._scroll("scroll", "-1", "pages", select=True))
+
     def _sort(self, event):
 
         # Get the listbox to sort by (mapped by the header buttons)
@@ -123,9 +129,47 @@ class MultiListbox(tk.Frame):
             list_widget.scan_dragto(x, y)
         return "break"
 
-    def _scroll(self, *args):
-        for list_widget in self.lists:
-            list_widget.yview(*args)
+    def _scroll(self, *args, **kwargs):
+        select = kwargs.pop("select", False)
+        logging.info("Scrolling -- args: %s, select: %s", args, select)
+
+        if select and self.curselection():
+            new_index, should_do_scroll = self.get_new_selection(args)
+            if new_index is None:
+                logging.debug("No selection change for args: %s - scrolling...", args)
+                should_do_scroll = True
+            else:
+                old_index = int(self.curselection()[0])
+                logging.debug("Changing selection from index %d to %d", old_index, new_index)
+                self._select_row(new_index)
+        else:
+            should_do_scroll = True
+
+        if should_do_scroll:
+            for list_widget in self.lists:
+                list_widget.yview(*args)
+
+    def get_new_selection(self, scroll_args):
+        """
+        If selection change upon scrolling is enabled, return the new index that should be selected after the
+        scroll operation finishes. If the new index is currently visible, just select it and skip the actual
+        scrolling process entirely.
+
+        :param list scroll_args: The arguments passed to the scrollbar widget
+        :return tuple: The index that should be selected afterward, followed by its current "selectability"
+        """
+        cur_selection = self.curselection()
+
+        # If the scrollbar is being dragged, or if nothing is currently selected, then do not select anything.
+        if scroll_args[0] != "scroll" or not cur_selection:
+            return None, False
+        amount = int(scroll_args[1])
+        pixel_dict = self.get_pixel_dict()
+        page_size = len(pixel_dict) - 2 if scroll_args[2] == "pages" else 1
+        scroll_diff = amount * page_size
+        old_index = int(cur_selection[0])
+        new_index = max(0, min(self.lists[0].size() - 1, old_index + scroll_diff))
+        return new_index, new_index not in pixel_dict
 
     def curselection(self):
         return self.lists[0].curselection()
@@ -174,6 +218,20 @@ class MultiListbox(tk.Frame):
         for list_widget in self.lists:
             list_widget.selection_set(first, last)
 
+    def get_pixel_dict(self):
+        list_box = self.lists[0]
+        height = list_box.winfo_height() + 1
+        pixel_dict = {list_box.nearest(height): height}
+        for pixel in xrange(height, 0, -1):
+            pixel_dict[list_box.nearest(pixel)] = pixel
+        max_index, bottom_y = max(pixel_dict.items())
+        item_height = bottom_y - pixel_dict.get(max_index - 1, 1)
+        while bottom_y + item_height < height:
+            max_index += 1
+            bottom_y += item_height
+            pixel_dict[max_index] = bottom_y
+        pixel_dict.pop(max_index)
+        return pixel_dict
 
 
 def browse_csv():
