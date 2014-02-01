@@ -5,6 +5,7 @@ import Tkinter as tk
 import Tkconstants as Tkc
 import tkFileDialog as Tkfc
 import tkFont as Tkf
+import tkMessageBox as Tkmb
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -174,14 +175,27 @@ class MultiListbox(tk.Frame):
             list_widget.selection_set(first, last)
 
 
-def main():
+
+def browse_csv():
     valid_filetypes = (("CSV files", "*.csv"), ("All files", "*.*"))
     file_path = Tkfc.askopenfilename(filetypes=valid_filetypes, initialdir=".")
-    reader = csv.reader(open(file_path).readlines())
     csv_lines = []
-    for line in reader:
-        csv_lines.append((line[0], line[1], int(line[2]), float(line[3]), int(line[4]), float(line[5])))
+    try:
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+        reader = csv.reader(lines)
+        for line in reader:
+            csv_lines.append((line[0], line[1], int(line[2]), float(line[3]), int(line[4]), float(line[5])))
+    except Exception as exc:
+        Tkmb.showerror(title=str(type(exc)), message="Could not read CSV file {0!r}".format(file_path))
+        csv_lines = []
+    return csv_lines
+
+
+def main():
+    csv_lines = browse_csv()
     root = tk.Tk()
+    root.withdraw()
     top_label = tk.Label(root, text="MultiListbox")
     top_label.pack()
     col_widths = (("Package", 40), ("Version", 10), ("Weight", 9),
