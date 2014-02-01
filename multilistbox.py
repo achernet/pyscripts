@@ -127,7 +127,7 @@ class MultiListbox(tk.Frame):
 
     def see(self, index):
         for list_widget in self.lists:
-            list_widget.selection_anchor(index)
+            list_widget.see(index)
 
     def selection_anchor(self, index):
         for list_widget in self.lists:
