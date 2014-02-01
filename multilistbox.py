@@ -6,6 +6,7 @@ import Tkconstants as Tkc
 import tkFileDialog as Tkfc
 import tkFont as Tkf
 import tkMessageBox as Tkmb
+import webbrowser
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -50,6 +51,7 @@ class MultiListbox(tk.Frame):
             list_box.bind("<Leave>", lambda e: "break")
             list_box.bind("<B2-Motion>", lambda e, s=self: s._b2motion(e.x, e.y))
             list_box.bind("<Button-2>", lambda e, s=self: s._button2(e.x, e.y))
+            list_box.bind("<Double-Button-1>", lambda e, s=self: s._activate(e.y))
 
         frame = tk.Frame(self)
         frame.pack(side=Tkc.LEFT, fill=Tkc.Y)
@@ -64,6 +66,7 @@ class MultiListbox(tk.Frame):
         self.bind_all("<Down>", lambda e, s=self: s._scroll("scroll", "1", "units", select=True))
         self.bind_all("<Next>", lambda e, s=self: s._scroll("scroll", "1", "pages", select=True))
         self.bind_all("<Prior>", lambda e, s=self: s._scroll("scroll", "-1", "pages", select=True))
+        self.bind_all("<Return>", lambda e, s=self: s._activate(e.y))
 
     def _sort(self, event):
 
@@ -105,6 +108,12 @@ class MultiListbox(tk.Frame):
         else:
             direction += 1
         self.colmapping[originating_button] = column, direction
+
+    def _activate(self, y):
+        item_info = self.get(self.curselection()[0])
+        logging.info("Opening PyPI web page for item: %s", item_info)
+        pypi_url = "https://pypi.python.org/pypi/{0[0]}".format(item_info)
+        webbrowser.open_new(pypi_url)
 
     def _select(self, y):
         row = self.lists[0].nearest(y)
