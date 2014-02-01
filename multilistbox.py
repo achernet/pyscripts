@@ -3,21 +3,39 @@ import csv
 import Tkinter as tk
 import Tkconstants as Tkc
 import tkFileDialog as Tkfc
+import tkFont as Tkf
 
 
 class MultiListbox(tk.Frame):
+
+    @property
+    def header_font(self):
+        if "header" in self.fonts:
+            return self.fonts["header"]
+        font_families = sorted(Tkf.families(self.master))
+        if "Liberation Sans" in font_families:
+            family = "Liberation Sans"
+        else:
+            family = "Tahoma"
+        font = Tkf.Font(family=family, size=13, weight=Tkf.BOLD)
+        self.fonts["header"] = font
+        return font
 
     def __init__(self, parent, lists):
         tk.Frame.__init__(self, parent)
         self.lists = []
         self.colmapping = {}
         self.orig_data = None
+        self.fonts = {}
         for label, width in lists:
             frame = tk.Frame(self)
             frame.pack(side=Tkc.LEFT, expand=Tkc.YES, fill=Tkc.BOTH)
+
             sort_button = tk.Button(frame, text=label, borderwidth=1, relief=Tkc.RAISED)
             sort_button.pack(fill=Tkc.X)
             sort_button.bind("<Button-1>", self._sort)
+            sort_button.config(font=self.header_font)
+
             self.colmapping[sort_button] = (len(self.lists), 1)
             list_box = tk.Listbox(frame, width=width, borderwidth=0, selectborderwidth=0,
                                   relief=Tkc.FLAT, exportselection=Tkc.FALSE)
@@ -28,6 +46,7 @@ class MultiListbox(tk.Frame):
             list_box.bind("<Leave>", lambda e: "break")
             list_box.bind("<B2-Motion>", lambda e, s=self: s._b2motion(e.x, e.y))
             list_box.bind("<Button-2>", lambda e, s=self: s._button2(e.x, e.y))
+
         frame = tk.Frame(self)
         frame.pack(side=Tkc.LEFT, fill=Tkc.Y)
         frame_label = tk.Label(frame, borderwidth=1, relief=Tkc.RAISED)
