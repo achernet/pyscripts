@@ -15,8 +15,12 @@ import logging
 import os
 import re
 import requests
-import sh
 import sys
+
+try:
+    import sh
+except ImportError:
+    import pbs as sh  # On Windows, pbs takes the place of sh
 
 logging.getLogger().setLevel(logging.DEBUG)
 
