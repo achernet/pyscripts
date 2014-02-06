@@ -1,6 +1,8 @@
+#!/usr/bin/env python
 import Tkinter as tk
 import Tkconstants as Tkc
 import logging
+import ttk
 
 
 class GuiMaxAge(object):
@@ -30,16 +32,16 @@ class GuiMaxAge(object):
         return 0.0 <= self.days <= 30.0
 
 
-class GuiQuery(object):
+class GuiQuery(ttk.Frame):
 
     def __init__(self, parent=None):
-        parent = parent or tk.Tk()
+        ttk.Frame.__init__(self, parent, padding=2)
 
-        self.query_frame = tk.Frame(parent)
+        self.query_frame = ttk.Frame(parent)
         self.query_frame.pack(side=Tkc.TOP, fill=Tkc.X)
-        self.options_frame = tk.Frame(parent)
+        self.options_frame = ttk.Frame(parent)
         self.options_frame.pack(side=Tkc.TOP, fill=Tkc.X)
-        self.days_frame = tk.Frame(parent)
+        self.days_frame = ttk.Frame(parent)
         self.days_frame.pack(side=Tkc.TOP, fill=Tkc.X)
 
         self.query_var = tk.StringVar(self.query_frame)
@@ -122,6 +124,10 @@ class GuiQuery(object):
     def on_max_age_validate(self, old_value, new_value):
         print "Validating max age ({0} -> {1})".format(old_value, new_value)
 
+    def quit(self, event=None):
+        print "Quitting... (event: {0})".format(event)
+        self.master.withdraw()
+
 
 class GuiLogger(logging.Handler):
 
@@ -149,17 +155,32 @@ class GuiLogger(logging.Handler):
 
 class MyGui(object):
 
-    TITLE = "PyPI Pip Search with Statistics (v.0.1.3)"
-
     def __init__(self, root=None):
         self.root = root or tk.Tk()
         self.root.title(self.TITLE)
 
-        self.options_panel = tk.Frame(self.root)
+        self.options_panel = ttk.Frame(self.root)
         self.options_panel.pack(side=Tkc.TOP, fill=Tkc.BOTH, expand=True)
-        self.log_panel = tk.Frame(self.root)
+        self.log_panel = ttk.Frame(self.root)
         self.log_panel.pack(side=Tkc.TOP, fill=Tkc.BOTH, expand=True)
-        self.results_panel = tk.Frame(self.root)
+        self.results_panel = ttk.Frame(self.root)
         self.results_panel.pack(side=Tkc.TOP, fill=Tkc.BOTH, expand=True)
 
         self.log_box = GuiLogger(parent=self.log_panel)
+
+
+def main():
+    root = tk.Tk()
+    root.withdraw()
+    root.title("PyPI Pip Search with Statistics (v.0.2.0)")
+    root.option_add("*tearOff", False)
+
+    gui_query = GuiQuery(root)
+
+    root.protocol("WM_DELETE_WINDOW", gui_query.quit)
+    root.deiconify()
+    root.mainloop()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
