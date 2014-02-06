@@ -70,10 +70,9 @@ class GuiQuery(ttk.Frame):
         self.age_label = tk.Label(self.days_frame, text="Days to cache package information:")
         self.age_label.pack(side=Tkc.LEFT)
         self.max_age = tk.Spinbox(self.days_frame, from_=0.0, to=30.0, increment=0.5, format="%0.3f",
-                                  textvariable=self.days_var, command=(self.on_max_age_change, "%s", "%P"),
-                                  validate=Tkc.ALL, validatecommand=(self.on_max_age_validate, "%s", "%P"))
+                                  textvariable=self.days_var)
         self.max_age.pack(side=Tkc.LEFT)
-        self.max_age.config(state=Tkc.DISABLED)
+        self.max_age.config(state="readonly")
 
     @property
     def query(self):
@@ -96,7 +95,7 @@ class GuiQuery(ttk.Frame):
                         "stats": self.should_do_stats,
                         "backup": self.should_do_backup,
                         "max_cache_age": self.max_cache_age}
-        print "Query will run with {0}".format(query_config)
+        logging.info("Query will run with %s", query_config)
 
     def on_write(self, name, index, mode, var=None):
         var = var or self.query_var
@@ -116,13 +115,13 @@ class GuiQuery(ttk.Frame):
     def on_backup_checked(self, name, index, mode, var=None):
         var = var or self.backup_var
         do_backup = self.should_do_backup
-        print "Backup search: {0}".format(self.backup_var.get())
+        logging.info("Backup search: %s", self.backup_var.get())
 
     def on_max_age_change(self, old_value, new_value):
-        print "Changing max age from {0} to {1}".format(old_value, new_value)
+        logging.info("Changing max age from %0.3f to %0.3f", old_value, new_value)
 
     def on_max_age_validate(self, old_value, new_value):
-        print "Validating max age ({0} -> {1})".format(old_value, new_value)
+        logging.info("Validating max age (%0.3f -> %0.3f)", old_value, new_value)
 
     def quit(self, event=None):
         print "Quitting... (event: {0})".format(event)
@@ -138,19 +137,16 @@ class GuiLogger(logging.Handler):
         parent = parent or tk.Tk()
         self.rsb = tk.Scrollbar(parent)
         self.rsb.pack(side=Tkc.RIGHT, fill=Tkc.Y)
-        self.bsb = tk.Scrollbar(parent)
-        self.bsb.pack(side=Tkc.BOTTOM, fill=Tkc.X)
-        self.widget = tk.Listbox(parent, xscrollcommand=self.bsb.set, yscrollcommand=self.rsb.set, bg="white")
+        self.widget = tk.Listbox(parent, yscrollcommand=self.rsb.set, bg="white")
         self.widget.pack(fill=Tkc.BOTH, expand=True)
         self.rsb.config(command=self.widget.yview)
-        self.bsb.config(command=self.widget.xview)
-        self.widget.config(state=Tkc.DISABLED)
+        self.widget.configure(state=Tkc.DISABLED)
 
     def emit(self, record):
-        self.widget.config(state=Tkc.NORMAL)
+        self.widget.configure(state=Tkc.NORMAL)
         self.widget.insert(Tkc.END, self.format(record) + "\n")
         self.widget.see(Tkc.END)
-        self.widget.config(state=Tkc.DISABLED)
+        # self.widget.configure(state=Tkc.DISABLED)
 
 
 class MyGui(object):
@@ -167,6 +163,7 @@ class MyGui(object):
         self.results_panel.pack(side=Tkc.TOP, fill=Tkc.BOTH, expand=True)
 
         self.log_box = GuiLogger(parent=self.log_panel)
+        self.log_box.pack(side=Tkc.BOTTOM, fill=Tkc.BOTH, expand=True)
 
 
 def main():
