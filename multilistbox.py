@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 import copy
 import csv
 import logging
 import Tkinter as tk
+import ttk
 import Tkconstants as Tkc
 import tkFileDialog as Tkfc
 import tkFont as Tkf
@@ -11,27 +13,15 @@ import webbrowser
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-class MultiListbox(tk.Frame):
-
-    @property
-    def header_font(self):
-        if "header" in self.fonts:
-            return self.fonts["header"]
-        font_families = sorted(Tkf.families(self.master))
-        if "Liberation Sans" in font_families:
-            family = "Liberation Sans"
-        else:
-            family = "Tahoma"
-        font = Tkf.Font(family=family, size=13, weight=Tkf.BOLD)
-        self.fonts["header"] = font
-        return font
+class MultiListbox(ttk.Frame):
 
     def __init__(self, parent, lists):
-        tk.Frame.__init__(self, parent)
+        ttk.Frame.__init__(self, parent)
         self.lists = []
         self.colmapping = {}
         self.orig_data = None
         self.fonts = {}
+        self.y_sel = None
         for label, width in lists:
             frame = tk.Frame(self)
             frame.pack(side=Tkc.LEFT, expand=Tkc.YES, fill=Tkc.BOTH)
@@ -67,6 +57,21 @@ class MultiListbox(tk.Frame):
         self.bind_all("<Next>", lambda e, s=self: s._scroll("scroll", "1", "pages", select=True))
         self.bind_all("<Prior>", lambda e, s=self: s._scroll("scroll", "-1", "pages", select=True))
         self.bind_all("<Return>", lambda e, s=self: s._activate(e.y))
+
+        self.master.protocol("WM_DELETE_WINDOW", self.master.destroy)
+
+    @property
+    def header_font(self):
+        if "header" in self.fonts:
+            return self.fonts["header"]
+        font_families = sorted(Tkf.families(self.master))
+        if "Liberation Sans" in font_families:
+            family = "Liberation Sans"
+        else:
+            family = "Tahoma"
+        font = Tkf.Font(family=family, size=13, weight=Tkf.BOLD)
+        self.fonts["header"] = font
+        return font
 
     def _sort(self, event):
 
@@ -124,6 +129,7 @@ class MultiListbox(tk.Frame):
         logging.info("Selecting row %d", row)
         self.selection_clear(0, Tkc.END)
         self.selection_set(row)
+        # self.see(row)
         return "break"
 
     def _button2(self, x, y):
@@ -256,22 +262,19 @@ def browse_csv():
     except Exception as exc:
         Tkmb.showerror(title=str(type(exc)), message="Could not read CSV file {0!r}".format(file_path))
         csv_lines = []
-    return csv_lines
+    return file_path, csv_lines
 
 
 def main():
-    csv_lines = browse_csv()
-    root = tk.Tk()
-    root.withdraw()
-    top_label = tk.Label(root, text="MultiListbox")
-    top_label.pack()
+    file_path, csv_lines = browse_csv()
     col_widths = (("Package", 40), ("Version", 10), ("Weight", 9),
                   ("DL Rate", 10), ("Age", 7), ("Score", 8))
-    mlb = MultiListbox(root, col_widths)
+    mlb = MultiListbox(None, col_widths)
+    mlb.master.title("Viewing {0}".format(file_path))
     for csv_line in csv_lines:
         mlb.insert(Tkc.END, csv_line)
     mlb.pack(expand=Tkc.YES, fill=Tkc.BOTH)
-    root.mainloop()
+    mlb.master.mainloop()
 
 
 if __name__ == "__main__":
