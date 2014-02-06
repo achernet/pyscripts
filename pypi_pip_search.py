@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 """
 Main module for running "new and improved" python package searches with better metrics.
 
@@ -8,6 +9,7 @@ from datetime import datetime, time as dt_time, timedelta
 from lxml.html import etree, HTMLParser
 from tempfile import NamedTemporaryFile
 from total_ordering import total_ordering
+import argcomplete
 import csv
 import dateutil.parser
 import json
@@ -601,6 +603,7 @@ def main(args):
                         type=str,
                         help="The path to aria2c(.exe) if not in current PATH environment")
     parser.set_defaults(aria2c_path=None)
+    argcomplete.autocomplete(parser)
     parser_ns = parser.parse_args(args)
 
     out_obj = OutputFile(parser_ns.search_term)
