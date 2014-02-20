@@ -34,7 +34,7 @@ class WinPythonLibFinder(object):
         self.element = tree
 
     def get_links_for_package(self, package_name):
-        xpath_arg = "//li[a[@id=\'{0}\']]/ul/li/a[@href]".format(package_name.lower())
+        xpath_arg = "//li[a[@id={0!r}]]/ul/li/a[@href]".format(package_name.lower())
         elems = self.element.xpath(xpath_arg)
         links_dict = {}
         for elem in elems:
