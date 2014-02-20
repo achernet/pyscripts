@@ -53,6 +53,7 @@ class GuiQuery(ttk.Frame):
         self.backup_var = tk.IntVar(self.options_frame)
         self.backup_var.trace("w", self.on_backup_checked)
         self.days_var = tk.StringVar(self.days_frame)
+        self.days_var.trace("w", self.on_days_changed)
 
         self.search_label = tk.Label(self.query_frame, text="Search Query:")
         self.search_label.pack(side=Tkc.LEFT)
@@ -118,6 +119,9 @@ class GuiQuery(ttk.Frame):
         var = var or self.backup_var
         do_backup = self.should_do_backup
         logging.info("Backup search: %s", self.backup_var.get())
+
+    def on_days_changed(self, name, index, mode, var=None):
+        var = var or self.days_var
 
     def on_max_age_change(self, old_value, new_value):
         logging.info("Changing max age from %0.3f to %0.3f", old_value, new_value)
