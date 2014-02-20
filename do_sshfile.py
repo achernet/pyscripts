@@ -118,7 +118,7 @@ def main(args):
     parser_ns = parse_args(args)
     sender = RemoteSender(parser_ns.password, parser_ns.command, parser_ns.link)
     ssh_arg = "\"{0.command} {0.link!r}\"".format(parser_ns)
-    command = sh.ssh.bake(parser_ns.remote[:-1], parser_ns.url)
+    command = sh.ssh.bake(parser_ns.remote[:-1], "--user-agent", "Mozilla/5.0", parser_ns.url)
     logging.info("Running command: %s", command)
     ssh_proc = command(_out=sender.ssh_interact, _out_bufsize=0, _tty_in=True)
     ssh_proc.wait()
