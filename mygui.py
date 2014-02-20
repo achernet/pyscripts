@@ -125,7 +125,7 @@ class GuiQuery(ttk.Frame):
 
     def quit(self, event=None):
         print "Quitting... (event: {0})".format(event)
-        self.master.withdraw()
+        self.master.destroy()
 
 
 class GuiLogger(logging.Handler):
