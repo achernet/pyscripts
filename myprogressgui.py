@@ -23,6 +23,26 @@ class InvalidGuiError(Exception):
         Exception.__init__(self, msg)
 
 
+class MinimumPacketRateSelector(ttk.Frame):
+
+    def __init__(self, parent=None, callbacks=None):
+        ttk.Frame.__init__(self, parent)
+        self.callbacks = callbacks or {}
+        self.label = ttk.Label(self)
+        self.selector = tk.Spinbox(self)
+
+        self.label.configure(text="Minimum packet rate: ")
+        self.selector.configure(values=[128, 256, 512, 1024, 2048, 4096], command=self.on_activate)
+        self.label.pack(side=Tkc.LEFT, expand=Tkc.X)
+        self.selector.pack(side=Tkc.RIGHT, expand=Tkc.X)
+
+    def on_activate(self, event=None):
+        print self.selector
+        if "activate" not in self.callbacks:
+            return
+        self.callbacks["activate"](event)
+
+
 class IPRangeArgPanel(ttk.Frame):
 
     def __init__(self, parent=None, iprange_arg=None, callbacks=None):
