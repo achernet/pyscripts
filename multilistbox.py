@@ -2,6 +2,8 @@
 import copy
 import csv
 import logging
+import os
+import platform
 import Tkinter as tk
 import ttk
 import Tkconstants as Tkc
@@ -270,6 +272,8 @@ def browse_csv(csv_file_path=None):
 
 
 def main(args):
+    if platform.system() not in ("Windows", "Java"):
+        os.environ.setdefault("DISPLAY", ":0")
     csv_file_path = args[0] if args else None
     file_path, csv_lines = browse_csv(csv_file_path)
     col_widths = (("Package", 40), ("Version", 10), ("Weight", 9),
