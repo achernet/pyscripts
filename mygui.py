@@ -4,6 +4,8 @@ import Tkconstants as Tkc
 import logging
 import ttk
 
+logging.getLogger().setLevel(logging.DEBUG)
+
 
 class GuiMaxAge(object):
     """
