@@ -1,6 +1,7 @@
 # Dependent files
 aria2c.exe
 ca-bundle.crt
+libcares-2.dll
 
 # CSV files (they contain the results of pypi_pip_search.py)
 *.csv
@@ -10,6 +11,8 @@ ca-bundle.crt
 
 # C extensions
 *.so
+*.o
+*.a
 
 # Packages
 *.egg
@@ -42,3 +45,13 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+.idea/
+
+# Logs
+*.log
+
+# Backup files
+*~
+*.bak
+*.sw.
+
