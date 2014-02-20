@@ -9,6 +9,7 @@ import tkFileDialog as Tkfc
 import tkFont as Tkf
 import tkMessageBox as Tkmb
 import webbrowser
+import sys
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -249,9 +250,12 @@ class MultiListbox(ttk.Frame):
         return pixel_dict
 
 
-def browse_csv():
-    valid_filetypes = (("CSV files", "*.csv"), ("All files", "*.*"))
-    file_path = Tkfc.askopenfilename(filetypes=valid_filetypes, initialdir=".")
+def browse_csv(csv_file_path=None):
+    if csv_file_path is None:
+        valid_filetypes = (("CSV files", "*.csv"), ("All files", "*.*"))
+        file_path = Tkfc.askopenfilename(filetypes=valid_filetypes, initialdir=".")
+    else:
+        file_path = csv_file_path
     csv_lines = []
     try:
         with open(file_path, "r") as f:
@@ -265,8 +269,9 @@ def browse_csv():
     return file_path, csv_lines
 
 
-def main():
-    file_path, csv_lines = browse_csv()
+def main(args):
+    csv_file_path = args[0] if args else None
+    file_path, csv_lines = browse_csv(csv_file_path)
     col_widths = (("Package", 40), ("Version", 10), ("Weight", 9),
                   ("DL Rate", 10), ("Age", 7), ("Score", 8))
     mlb = MultiListbox(None, col_widths)
@@ -278,4 +283,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
