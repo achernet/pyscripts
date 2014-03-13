@@ -18,6 +18,7 @@ import os
 import re
 import requests
 import sys
+import progbar
 
 try:
     import sh
@@ -82,7 +83,7 @@ class NamedObject(object):
         """
         Update this object with the information contained within C{new_content}.
 
-        @param new_content: The content to update this object with
+        :param new_content: The content to update this object with
         @type new_content: str|unicode
         """
         raise NotImplementedError
@@ -201,9 +202,9 @@ class PypiSearchResult(NamedObject):
         """
         Return True if this file has been recently downloaded.
 
-        @param search_dir: The directory to search in
+        :param search_dir: The directory to search in
         @type search_dir: str
-        @param max_days: The maximum number of days to consider "recent"
+        :param max_days: The maximum number of days to consider "recent"
         @type max_days: float
         @return: True if there is a file recently downloaded, otherwise False
         @rtype: bool
@@ -272,7 +273,7 @@ class PypiSearchResult(NamedObject):
         """
         Return True if this result would be expected in the list from pip search, otherwise False.
 
-        @param search_term: the specific search term to compare
+        :param search_term: the specific search term to compare
         @type search_term: basestring
         """
         if self.weight == 2:
@@ -349,28 +350,41 @@ class PypiJsonSearchResult(PypiSearchResult):
             return False
 
 
-class DownloadMapper(object):
+class DownloadMapper(progbar.QueuingThread):
     """
     Class to handle the parallel downloading of named objects.
     """
 
-    def __init__(self, named_objects):
+    def __init__(self, queue, named_objects, max_age_days, aria2c_path):
         """
-        @param named_objects: The list of named objects
+        :param named_objects: The list of named objects
         @type named_objects: [NamedObject]
         """
+        progbar.QueuingThread.__init__(self, queue)
         self.nrmap = {}
         for nobj in named_objects:
             self.nrmap[nobj.name] = nobj
         self.paths = []
         self.backups_needed = []
+        self.max_age_days = max_age_days
+        self.aria2c_path = aria2c_path
+        self.ntf = NamedTemporaryFile(delete=False)
+        self.ntf_dir = self.get_proper_path(os.path.dirname(self.ntf.name))
+        for result in self.nrmap.values():
+            # Skip results that have already been downloaded recently.
+            if result.has_recent_download(self.ntf_dir, self.max_age_days):
+                self.paths.append(os.path.join(self.ntf_dir, result.name))
+                continue
+            self.ntf.write(result.to_aria2_input_entry())
+        self.ntf.close()
+        logging.info("aria2c input file saved to %r (dir: %r)", self.ntf.name, self.ntf_dir)
 
     def get_proper_path(self, file_path):
         """
         Get the "proper" format for C{file_path} by removing Cygwin-specific formatting, if it exists.
         This is necessary because aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
 
-        @param file_path: The path to convert if deemed necessary
+        :param file_path: The path to convert if deemed necessary
         @type file_path: str or unicode
         @return: The converted file path
         @rtype: str or unicode
@@ -380,62 +394,48 @@ class DownloadMapper(object):
             print file_path
         return file_path
 
-    def run_aria2(self, max_age_days, aria2c_path):
-        """
-        Run aria2c to execute all the downloads and save their file paths.
-
-        @param max_age_days: The maximum age a file should be in order to be considered "recent" (and skipped over)
-        @type max_age_days: float
-        @param aria2c_path: The path to the aria2c(.exe) executable, or None to search for it in the PATH environment
-        @type aria2c_path: str or None
-        """
-        if self.paths:
-            log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
-            logging.error(log_fmt, len(self.paths))  # TODO:ABC: make this raise some kind of exception?
-            return
-        total = len(self.nrmap)
-
-        # Make a (temporary) input file in the default TEMP directory, populating it with each URL and output path.
-        with NamedTemporaryFile(delete=False) as ntf:
-            ntf_dir = self.get_proper_path(os.path.dirname(ntf.name))
-            for result in self.nrmap.values():
-
-                # Skip results that have already been downloaded recently.
-                if result.has_recent_download(ntf_dir, max_age_days):
-                    self.paths.append(os.path.join(ntf_dir, result.name))
-                    continue
-                ntf.write(result.to_aria2_input_entry())
-        logging.info("aria2c input file saved to %r (dir: %r)", ntf.name, ntf_dir)
-
-        # If a path to aria2c(.exe) was passed in, try to use it. Otherwise, try to resolve that path using the
-        # current environment (specifically, the PATH variable).
-        aria2c_path = aria2c_path or sh.resolve_program("aria2c")
+    def build_command(self):
+        aria2c_path = self.aria2c_path or sh.resolve_program("aria2c") or sh.resolve_program("aria2c.exe")
         if aria2c_path is None:
             logging.error("aria2c is missing from the current configuration!")
             return
         aria2_cmd = sh.Command(aria2c_path)
 
         # Run and observe the above aria2c executable, reporting download progress to the appropriate logger.
-        local_aria2c_options = {"input-file": self.get_proper_path(ntf.name),
-                                "dir": ntf_dir,
+        local_aria2c_options = {"input-file": self.get_proper_path(self.ntf.name),
+                                "dir": self.ntf_dir,
                                 "max-download-result": len(self.nrmap)}
         aria2_cmd = aria2_cmd.bake(ARIA2C_OPTIONS).bake(local_aria2c_options)
+        aria2_cmd = aria2_cmd.bake(_iter=True, _tty_out=False, _ok_code=1)
         logging.info("Command to execute: %s", aria2_cmd)
-        try:
-            for line in aria2_cmd(_iter=True, _ok_code=1, _err_to_out=True, _tty_out=False, _bg=True):
-                if not isinstance(line, (str, unicode)):
-                    continue
-                sys.stdout.write(line)
+        return aria2_cmd
 
-                # Process lines representing finished files
-                done_match = ARIA2_DOWNLOAD_COMPLETE_RGX.search(line)
-                if done_match is not None:
-                    self.paths.append(done_match.group("path"))
-                    percent_done = 100.0 * float(len(self.paths)) / float(total)
-                    logging.info("Download %d of %d (%.3f%%) complete", len(self.paths), total, percent_done)
+    def compile_progress_regex(self):
+        return ARIA2_DOWNLOAD_COMPLETE_RGX
 
-        except sh.ErrorReturnCode as err:
-            logging.exception("Download failed! Printing stack...\n%s%s", err.stdout, err.stderr)
+    def enqueue_progress_match(self, progress_match):
+        group_dict = progress_match.groupdict()
+        self.paths.append(group_dict["path"])
+        msg_dict = {"value": len(self.paths),
+                    "maximum": len(self.nrmap),
+                    "status": "Download complete: {0}".format(group_dict["path"])}
+        self.queue.put(msg_dict)
+
+    def run(self):
+        """
+        Run aria2c to execute all the downloads and save their file paths.
+
+        :param max_age_days: The maximum age a file should be in order to be considered "recent" (and skipped over)
+        @type max_age_days: float
+        :param aria2c_path: The path to the aria2c(.exe) executable, or None to search for it in the PATH environment
+        @type aria2c_path: str or None
+        """
+        if self.paths:
+            log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
+            logging.error(log_fmt, len(self.paths))  # TODO:ABC: make this raise some kind of exception?
+            return
+        progbar.QueuingThread.run(self)
+        self.update_objects()
 
     def update_objects(self):
         """
@@ -482,11 +482,12 @@ def query_initial_packages(search_term):
     Perform an initial package search on PyPI with the given C{search_term}, and return a list of
     C{PypiSearchResult} named objects.
 
-    @param search_term: The initial search query
+    :param search_term: The initial search query
     @type search_term: str
     @return: The list of search results
     @rtype: list[PypiSearchResult]
     """
+    logging.info("Querying initial packages for %s...", search_term)
     result_page = requests.get(PYPI_BASE_URL, params={":action": "search", "term": search_term})
     result_tree = etree.fromstring(result_page.content, HTMLParser())
     result_tree.make_links_absolute(PYPI_BASE_URL)
@@ -507,29 +508,32 @@ def search_packages(search_term, collect_stats=True, backup_search=False,
     and/or running backup updates for any packages whose age was not determined
     initially.
 
-    @param search_term: The search term
-    @type search_term: str|unicode
-    @param collect_stats: True to collect stats, otherwise False
-    @type collect_stats: bool
-    @param backup_search: True to run backup searches, otherwise False
-    @type backup_search: bool
-    @param max_age_days: The maximum days of age files should be
-    @type max_age_days: float
-    @param aria2c_path: The path to the aria2c executable
-    @type aria2c_path: str or None
-    @return: The resulting search results
-    @rtype: list[PypiSearchResult]
+    :param basestring search_term: The search term
+    :param bool collect_stats: True to collect stats, otherwise False
+    :param bool backup_search: True to run backup searches, otherwise False
+    :param float max_age_days: The maximum days of age files should be
+    :param basestring aria2c_path: The path to the aria2c executable, or None to look for it on PATH
+    :return: The resulting search results
+    :rtype: list[:class:`PypiSearchResult`]
     """
     initial_results = query_initial_packages(search_term)
     if not collect_stats:
         return initial_results
-    stats_downloader = DownloadMapper(initial_results)
-    stats_downloader.run_aria2(max_age_days, aria2c_path)
-    stats_downloader.update_objects()
+    thread_creator = lambda queue: DownloadMapper(queue, initial_results, max_age_days, aria2c_path)
+    # Create a generic progress bar dialog for monitoring the download progress.
+    stats_progbar = progbar.GenericProgressBar(title="Downloading packages...",
+                                               maximum=len(initial_results),
+                                               value=0,
+                                               status="Starting aria2c...",
+                                               thread_creator=thread_creator)
+    with stats_progbar:
+        pass
+    #stats_downloader.run()
+    #stats_downloader.update_objects()
     if not backup_search:
-        return stats_downloader.named_objects
-    stats_downloader.update_required_backups()
-    return stats_downloader.named_objects
+        return stats_progbar.thread.named_objects
+    stats_progbar.thread.update_required_backups()
+    return stats_progbar.thread.named_objects
 
 
 class OutputFile(object):
