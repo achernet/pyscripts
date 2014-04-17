@@ -1,3 +1,4 @@
+from cStringIO import StringIO
 
 
 def assign_binary_data(variable_name, initial_indent, maximum_width, data_string):
@@ -26,7 +27,7 @@ def assign_binary_data(variable_name, initial_indent, maximum_width, data_string
 
     total = 0
     data_buffer.write("\'")  # start the first string
-    for i, ch in enumerate(compressedData):
+    for i, ch in enumerate(data_string):
         next_total = total + lengths[ord(ch)]
         if next_total > max_string_length:
             data_buffer.write("\'\n")  # end quote for current line, plus line separator
