@@ -34,6 +34,8 @@ def parse_args(args):
     ap.add_argument("-n", "--num-rows", type=int, default=512, help="The maximum number of rows to return")
     ap.add_argument("-cp", "--class-path", action="store_true", default=False,
                     help="Enable exact Java classpath searches")
+    ap.add_argument("-c", "--class-name", action="store_true", default=False,
+                    help="Enable searches by Java class name")
     ap.add_argument("search_term")
     parser_ns = ap.parse_args(args)
     return parser_ns
@@ -41,7 +43,12 @@ def parse_args(args):
 
 def main(args):
     parser_ns = parse_args(args)
-    search_term = "fc:\"{0}\"".format(parser_ns.search_term) if parser_ns.class_path else parser_ns.search_term
+    if parser_ns.class_path:
+        search_term = "fc:\"{0}\"".format(parser_ns.search_term)
+    elif parser_ns.class_name:
+        search_term = "c:\"{0}\"".format(parser_ns.search_term)
+    else:
+        search_term = parser_ns.search_term
     num_rows = parser_ns.num_rows
     maven_dict = query_maven(search_term, num_rows)
     docs_by_key = maven_dict['latest'].items()
