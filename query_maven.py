@@ -5,7 +5,9 @@ from datetime import datetime
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import logging
 
-logging.getLogger().setLevel(logging.DEBUG)
+logging.basicConfig()
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.DEBUG)
 
 
 def query_maven(search_term, num_rows=400):
