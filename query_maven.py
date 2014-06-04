@@ -10,23 +10,47 @@ logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
 
 
+class ResponseWrapper(object):
+
+    def __init__(self, response):
+        self.response = response
+
+    @property
+    def total_time(self):
+        return self.response.elapsed.seconds * 1.0e3 + self.response.elapsed.microseconds * 1e-3
+
+    @property
+    def query_time(self):
+        return self.response.json()['responseHeader']['QTime']
+
+    @property
+    def total(self):
+        return self.response.json()['response']['numFound']
+
+    def maven_docs(self):
+        try:
+            return sorted(self.response.json()['response']['docs'], key=lambda d: d['timestamp'], reverse=True)
+        except Exception as e:
+            return []
+
+    def latest_versions(self):
+        docs = self.maven_docs()
+        latest_versions = {}
+        for doc in docs:
+            latest_versions.setdefault((doc['g'], doc['a']), []).append(doc)
+        return latest_versions
+
+
 def query_maven(search_term, num_rows, start):
     query_url = "http://search.maven.org/solrsearch/select"
     query_params = {"q": search_term, "rows": num_rows, "wt": "json", "start": start}
     resp = requests.get(query_url, params=query_params)
-    time_taken = resp.elapsed.seconds * 1e3 + resp.elapsed.microseconds * 1e-3
-    print "Maven query took {0:0.0f} ms".format(time_taken)
-    try:
-        maven_docs = resp.json()["response"]["docs"]
-    except:
-        print >> sys.stderr, "Invalid data came back! Make sure proxy is configured properly."
-        maven_docs = []
-    maven_docs.sort(key=lambda md: md["timestamp"], reverse=True)
-    latest_versions = {}
-    for doc in maven_docs:
-        latest_versions.setdefault((doc['g'], doc['a']), []).append(doc)
-    return {"docs": maven_docs,
-            "latest": latest_versions}
+    wrapper = ResponseWrapper(resp)
+    logger.info("Maven query took %0.0f ms", wrapper.total_time)
+    return {"docs": wrapper.maven_docs(),
+            "latest": wrapper.latest_versions(),
+            "total": wrapper.total,
+            "query_time": wrapper.query_time}
 
 
 def parse_args(args):
@@ -55,7 +79,7 @@ def main(args):
     maven_dict = query_maven(search_term, parser_ns.num_rows, parser_ns.start)
     docs_by_key = maven_dict['latest'].items()
     docs_by_key.sort(key=lambda (k, vs): max([v['timestamp'] for v in vs]), reverse=True)
-    print "Maven Central found {0} matches ({1} unique)!\n".format(len(maven_dict["docs"]), len(docs_by_key))
+    logger.info("Maven Central found %d matches (%d unique!)", maven_dict['total'], len(docs_by_key))
     for key, docs in docs_by_key:
         print "{0[0]} - {0[1]}:".format(key)
         for doc in docs:
