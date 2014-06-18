@@ -19,6 +19,8 @@ import re
 import requests
 import sys
 import progbar
+from generic_download_queue import GenericDownloadQueue
+from queuing_thread import QueuingThread
 
 try:
     import sh
@@ -350,7 +352,7 @@ class PypiJsonSearchResult(PypiSearchResult):
             return False
 
 
-class DownloadMapper(progbar.QueuingThread):
+class DownloadMapper(QueuingThread):
     """
     Class to handle the parallel downloading of named objects.
     """
@@ -360,7 +362,7 @@ class DownloadMapper(progbar.QueuingThread):
         :param named_objects: The list of named objects
         @type named_objects: [NamedObject]
         """
-        progbar.QueuingThread.__init__(self, queue)
+        QueuingThread.__init__(self, queue)
         self.nrmap = {}
         for nobj in named_objects:
             self.nrmap[nobj.name] = nobj
@@ -434,7 +436,7 @@ class DownloadMapper(progbar.QueuingThread):
             log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
             logging.error(log_fmt, len(self.paths))  # TODO:ABC: make this raise some kind of exception?
             return
-        progbar.QueuingThread.run(self)
+        QueuingThread.run(self)
         self.update_objects()
 
     def update_objects(self):
@@ -521,15 +523,18 @@ def search_packages(search_term, collect_stats=True, backup_search=False,
         return initial_results
     thread_creator = lambda queue: DownloadMapper(queue, initial_results, max_age_days, aria2c_path)
     # Create a generic progress bar dialog for monitoring the download progress.
-    stats_progbar = progbar.GenericProgressBar(title="Downloading packages...",
-                                               maximum=len(initial_results),
-                                               value=0,
-                                               status="Starting aria2c...",
-                                               thread_creator=thread_creator)
+    try:
+        stats_progbar = progbar.GenericProgressBar(title="Downloading packages...",
+                                                   maximum=len(initial_results),
+                                                   value=0,
+                                                   status="Starting aria2c...",
+                                                   thread_creator=thread_creator)
+    except Exception as e:
+        logging.exception("Exception was raised drawing progress bar: %s", e)
+        stats_progbar = GenericDownloadQueue(thread_creator=thread_creator)
+
     with stats_progbar:
         pass
-    #stats_downloader.run()
-    #stats_downloader.update_objects()
     if not backup_search:
         return stats_progbar.thread.named_objects
     stats_progbar.thread.update_required_backups()
