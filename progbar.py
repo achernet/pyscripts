@@ -2,29 +2,13 @@
 import Tkinter as tk
 import Tkconstants as Tkc
 import ttk
-import time
-import random
-import sys
-from threading import Thread
-import os.path as osp
-import os
-import re
 import logging
-import sh
-from Queue import Queue
-import netaddr as NA
+from generic_download_queue import GenericDownloadQueue
 
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-class GenericProgressBar(ttk.Frame):
-
-    DEFAULT_TITLE = "Downloading package information from PyPI..."
-    DEFAULT_MAXIMUM = 100
-    DEFAULT_START_VALUE = 0
-    DEFAULT_STATUS = "Downloading..."
-    DEFAULT_THREAD_CREATOR = lambda queue: None
-
+class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
     @property
     def maximum(self):
         return self._maximum
@@ -94,22 +78,20 @@ class GenericProgressBar(ttk.Frame):
         :param func thread_creator: A callback function that takes a queue and returns a queuing thread
         """
         # Coerce parameters to defaults as necessary.
-        title = title or self.DEFAULT_TITLE
-        maximum = maximum or self.DEFAULT_MAXIMUM
-        value = value or self.DEFAULT_START_VALUE
-        status = status or self.DEFAULT_STATUS
-        thread_creator = thread_creator or self.DEFAULT_THREAD_CREATOR
+        title = title or "Downloading package information from PyPI..."
+        maximum = maximum or 100
+        value = value or 0
+        status = status or "Downloading..."
+        GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
 
-        # Call the parent constructor.
+        # Call the parent constructors.
+        GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
         master = master or tk.Tk()
         ttk.Frame.__init__(self, master)
 
         # Set up member variables (non-GUI first).
-        self.queue = Queue()
-        self.thread = None
         self.bar_mover = None
         self.is_ascending = True
-        self.thread_creator = thread_creator
         self._maximum = maximum
         self._value = value
         self._status = status
@@ -126,6 +108,7 @@ class GenericProgressBar(ttk.Frame):
         button_frame = ttk.Frame(self.master)
         self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self.cancel_download)
         self.cancel_button.configure(state=Tkc.DISABLED)
+
         # Set up packing for the GUI.
         self.status_label.pack(padx=5, pady=5)
         self.progressbar.pack(anchor=Tkc.W, expand=True, fill=Tkc.X, padx=5, side=Tkc.LEFT)
@@ -139,17 +122,12 @@ class GenericProgressBar(ttk.Frame):
 
     def __enter__(self):
         self.cancel_button.configure(state=Tkc.ACTIVE)
-        self.thread = self.thread_creator(self.queue)
-        self.thread.start()
-        self.call_periodically()
-        return self
+        return GenericDownloadQueue.__enter__(self)
 
     def __exit__(self, *args):
-        while self.thread.is_alive():
-            self.update()
-        # self.cancel_download()
+        threadStatus = GenericDownloadQueue.__exit__(self, *args)
         self.destroy()
-        return False
+        return threadStatus
 
     def configure(self, cnf=None, **kwargs):
         """
@@ -175,13 +153,11 @@ class GenericProgressBar(ttk.Frame):
         return ttk.Frame.configure(self, cnf, **kwargs)
 
     def on_closing(self, event=None):
-        if self.thread is not None:
-            self.thread.cancel()
+        self.shutdown()
         self.destroy()
 
     def cancel_download(self):
-        if self.thread is not None:
-            self.thread.cancel()
+        GenericDownloadQueue.cancel_download(self)
         self.cancel_button.configure(state=Tkc.DISABLED)
         self.status = "Cancelling..."
         self.progressbar.configure(value=0)
@@ -192,19 +168,6 @@ class GenericProgressBar(ttk.Frame):
         self.checkqueue()
         if self.thread.is_alive():
             self.after(wait_time_ms, self.call_periodically)
-        else:
-            self.cancel_button.configure(state=Tkc.DISABLED)
-            self.progressbar.configure(value=0)
-
-    def checkqueue(self):
-        while self.queue.qsize():
-            try:
-                msg = self.queue.get()
-                self.configure(**msg)
-            except Exception as e:
-                logging.exception("Error in checkqueue(): %s", e)
-
-
             return
         self.cancel_button.configure(state=Tkc.DISABLED)
         self.progressbar.configure(value=0)
