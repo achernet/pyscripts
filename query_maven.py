@@ -11,6 +11,9 @@ logger.setLevel(logging.DEBUG)
 
 
 class ResponseWrapper(object):
+    """
+    Wrapper for an HTTP response that contains the results of a Maven query.
+    """
 
     def __init__(self, response):
         self.response = response
@@ -41,7 +44,17 @@ class ResponseWrapper(object):
         return latest_versions
 
 
-def query_maven(search_term, num_rows, start):
+def query_maven(search_term, num_rows, start, class_name=False, class_path=False):
+    """
+    Query Maven Central with the given parameters.
+    """
+    if class_path:
+        search_format = "\"fc:{0}\""
+    elif class_name:
+        search_format = "\"c:{0}\""
+    else:
+        search_format = "{0}"
+    search_term = search_format.format(search_term)
     query_url = "http://search.maven.org/solrsearch/select"
     query_params = {"q": search_term, "rows": num_rows, "wt": "json", "start": start}
     resp = requests.get(query_url, params=query_params)
@@ -54,6 +67,12 @@ def query_maven(search_term, num_rows, start):
 
 
 def parse_args(args):
+    """
+    Parse the given list of arguments and return the resulting parser namespace.
+
+    :param list args: The list of program arguments (e.g. sys.argv[1:])
+    :return: The parser namespace
+    """
     ap = ArgumentParser("Maven Finder", formatter_class=ArgumentDefaultsHelpFormatter)
     ap.add_argument("-n", "--num-rows", type=int, default=512,
                     help="The maximum number of rows to return")
@@ -63,6 +82,7 @@ def parse_args(args):
                     help="Enable exact Java classpath searches")
     ap.add_argument("-c", "--class-name", action="store_true", default=False,
                     help="Enable searches by Java class name")
+    ap.add_argument("-o", "--output", help="The output file - default is stdout", default=None)
     ap.add_argument("search_term")
     parser_ns = ap.parse_args(args)
     return parser_ns
@@ -85,6 +105,7 @@ def main(args):
         for doc in docs:
             version = doc.get('v', doc.get('latestVersion'))
             print "\t{0} @ {1}".format(version, datetime.fromtimestamp(doc['timestamp'] / 1000.))
+    return maven_dict
 
 
 if __name__ == "__main__":  # pragma: no cover
