@@ -1,13 +1,13 @@
 from Queue import Queue
+import time
 import logging
-import threading
 
 
 class GenericDownloadQueue(object):
 
     def __init__(self, thread_creator=None):
         if not thread_creator:
-            self.thread_creator = lambda _: None
+            self.thread_creator = lambda queue: None
         else:
             self.thread_creator = thread_creator
         self.queue = Queue()
@@ -22,7 +22,7 @@ class GenericDownloadQueue(object):
     def __exit__(self, *args):
         while self.thread.is_alive():
             self.update()
-        return True
+        return False
 
     def shutdown(self):
         if self.thread is not None:
@@ -36,10 +36,8 @@ class GenericDownloadQueue(object):
     def call_periodically(self, wait_time_ms=50):
         self.checkqueue()
         if self.thread.is_alive():
-            next_call_timer = threading.Timer(wait_time_ms * 1.0e-3, self.call_periodically, wait_time_ms)
-            next_call_timer.start()
-            return False
-        return True
+            time.sleep(wait_time_ms)
+            self.call_periodically()
 
     def checkqueue(self):
         while self.queue.qsize():
@@ -50,4 +48,4 @@ class GenericDownloadQueue(object):
                 logging.exception("Error in checkqueue(): %s", e)
 
     def configure(self, **kwargs):
-        print kwargs
+        pass

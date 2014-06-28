@@ -82,6 +82,7 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         maximum = maximum or 100
         value = value or 0
         status = status or "Downloading..."
+        GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
 
         # Call the parent constructors.
         GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
@@ -164,9 +165,9 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
             self.queue.get()
 
     def call_periodically(self, wait_time_ms=50):
-        is_finished = GenericDownloadQueue.call_periodically(self, wait_time_ms)
-        if not is_finished:
-            return is_finished
+        self.checkqueue()
+        if self.thread.is_alive():
+            self.after(wait_time_ms, self.call_periodically)
+            return
         self.cancel_button.configure(state=Tkc.DISABLED)
         self.progressbar.configure(value=0)
-        return True
