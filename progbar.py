@@ -9,6 +9,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 
 class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
+
     @property
     def maximum(self):
         return self._maximum
@@ -79,7 +80,7 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         """
         # Coerce parameters to defaults as necessary.
         title = title or "Downloading package information from PyPI..."
-        maximum = maximum or 100
+        maximum = maximum or self.DEFAULT_MAXIMUM
         value = value or 0
         status = status or "Downloading..."
         GenericDownloadQueue.__init__(self, thread_creator=thread_creator)

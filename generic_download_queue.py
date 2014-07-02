@@ -1,13 +1,16 @@
 from Queue import Queue
 import time
 import logging
+import threading
 
 
 class GenericDownloadQueue(object):
 
+    DEFAULT_MAXIMUM = 100
+
     def __init__(self, thread_creator=None):
         if not thread_creator:
-            self.thread_creator = lambda queue: None
+            self.thread_creator = lambda _: None
         else:
             self.thread_creator = thread_creator
         self.queue = Queue()
@@ -48,4 +51,7 @@ class GenericDownloadQueue(object):
                 logging.exception("Error in checkqueue(): %s", e)
 
     def configure(self, **kwargs):
+        pass
+
+    def update(self):
         pass
