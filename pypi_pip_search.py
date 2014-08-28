@@ -33,6 +33,10 @@ ARIA2_CA_CERTIFICATE_PATH = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 ARIA2_DOWNLOAD_COMPLETE_RGX = re.compile("Download complete:\\s+(?P<path>.*)$")
 ARIA2C_OPTIONS = {"no-conf": True,
                   "timeout": 30,
+                  "connect-timeout": 30,
+                  "lowest-speed-limit": 1024,
+                  "file-allocation": "falloc",
+                  "min-split-size": 1048576,
                   "summary-interval": 2,
                   "max-connection-per-server": 1,
                   "connect-timeout": 30,
