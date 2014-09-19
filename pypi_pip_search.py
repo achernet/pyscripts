@@ -337,7 +337,13 @@ class PypiJsonSearchResult(PypiSearchResult):
         return PypiJsonSearchResult(link, weight, "", rates, start_date)
 
     def apply_update(self, new_content):
-        json_dict = json.loads(new_content)
+        try:
+            json_dict = json.loads(new_content)
+        except ValueError as e:
+            logging.exception("Error parsing JSON content update:\n%r", new_content)
+            self.download_counts = [-1.0, -1.0, -1.0]
+            self.last_update = None
+            return False
         dl_info = json_dict["info"]["downloads"]
         self.download_counts = [float(dl_info[k]) for k in ["last_day", "last_week", "last_month"]]
         upload_time_strs = [url_info["upload_time"] for url_info in json_dict["urls"]]
