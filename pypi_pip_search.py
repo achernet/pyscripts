@@ -29,8 +29,6 @@ except ImportError:
 
 logging.getLogger().setLevel(logging.DEBUG)
 
-ARIA2_CA_CERTIFICATE_PATH = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
-ARIA2_DOWNLOAD_COMPLETE_RGX = re.compile("Download complete:\\s+(?P<path>.*)$")
 ARIA2C_OPTIONS = {"no-conf": True,
                   "timeout": 30,
                   "connect-timeout": 30,
@@ -55,13 +53,10 @@ ARIA2C_OPTIONS = {"no-conf": True,
                   "http-accept-gzip": True,
                   "enable-http-pipelining": True,
                   "enable-http-keep-alive": False,
-                  "ca-certificate": ARIA2_CA_CERTIFICATE_PATH,
-                  "check-certificate": "false"}  # os.path.exists(ARIA2_CA_CERTIFICATE_PATH)}
-
-DOWNLOAD_COUNT_XPATH = "//ul[@class=\"nodot\"][li[strong[starts-with(text(), \"Downloads\")]]]/li/span/text()"
-LAST_UPDATE_XPATH = "//table[@class=\"list\"]/tr[@class]/td[4]/text()"
-PYPI_BASE_URL = "https://pypi.python.org/pypi"
-SEARCH_RESULTS_XPATH = "//table[@class=\"list\"]/tr[@class][td]"
+                  "log-level": "notice",
+                  "console-log-level": "notice",
+                  "ca-certificate": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"}
+ARIA2C_OPTIONS["check-certificate"] = os.path.exists(ARIA2C_OPTIONS["ca-certificate"])
 
 
 class NamedObject(object):
@@ -228,8 +223,9 @@ class PypiSearchResult(NamedObject):
         From the given page content, parse and add the download statistics to this search result.
         """
         tree = etree.fromstring(page_content, HTMLParser())
-        self.download_counts = [float(count) for count in tree.xpath(DOWNLOAD_COUNT_XPATH)]
-        last_update = tree.xpath(LAST_UPDATE_XPATH)
+        counts = tree.xpath("//ul[@class=\"nodot\"][li[strong[starts-with(text(), \"Downloads\")]]]/li/span/text()")
+        self.download_counts = [float(count) for count in counts]
+        last_update = tree.xpath("//table[@class=\"list\"]/tr[@class]/td[4]/text()")
         if last_update not in [None, []]:
             self.last_update = dateutil.parser.parse(last_update[0], ignoretz=True)
             return True
@@ -417,7 +413,7 @@ class DownloadMapper(QueuingThread):
         return aria2_cmd
 
     def compile_progress_regex(self):
-        return ARIA2_DOWNLOAD_COMPLETE_RGX
+        return re.compile("Download complete:\\s+(?P<path>.*)$")
 
     def enqueue_progress_match(self, progress_match):
         group_dict = progress_match.groupdict()
@@ -494,10 +490,10 @@ def query_initial_packages(search_term):
     @rtype: list[PypiSearchResult]
     """
     logging.info("Querying initial packages for %s...", search_term)
-    result_page = requests.get(PYPI_BASE_URL, params={":action": "search", "term": search_term})
+    result_page = requests.get("https://pypi.python.org/pypi", params={":action": "search", "term": search_term})
     result_tree = etree.fromstring(result_page.content, HTMLParser())
-    result_tree.make_links_absolute(PYPI_BASE_URL)
-    result_tags = result_tree.xpath(SEARCH_RESULTS_XPATH)
+    result_tree.make_links_absolute(result_page.url)
+    result_tags = result_tree.xpath("//table[@class=\"list\"]/tr[@class][td]")
     results = []
     for lxml_element in result_tags:
         result_obj = PypiJsonSearchResult(link="{0}/json".format(lxml_element[0][0].get("href")),
