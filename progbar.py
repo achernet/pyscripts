@@ -68,7 +68,7 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         else:
             return "{0:.1f}%".format(self.value * 100.0 / self.maximum)
 
-    def __init__(self, master=None, title=None, maximum=None, value=None, status=None, thread_creator=None):
+    def __init__(self, master=None, title=None, maximum=None, value=None, status=None, thread_creator=None, call_interval=50):
         """
         :param master: The master top-level form to place this progress bar in (or None to make a new one)
         :type master: :class:`ttk.Frame`
@@ -77,6 +77,7 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         :param float value: The starting (and "current") value for the progress bar.
         :param str status: The text to assign to the status label.
         :param func thread_creator: A callback function that takes a queue and returns a queuing thread
+        :param int call_interval: The periodic update interval, in milliseconds
         """
         # Coerce parameters to defaults as necessary.
         title = title or "Downloading package information from PyPI..."
@@ -86,7 +87,7 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
 
         # Call the parent constructors.
-        GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
+        GenericDownloadQueue.__init__(self, thread_creator=thread_creator, call_interval=call_interval)
         master = master or tk.Tk()
         ttk.Frame.__init__(self, master)
 
@@ -165,10 +166,10 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         while self.queue.qsize():
             self.queue.get()
 
-    def call_periodically(self, wait_time_ms=50):
+    def call_periodically(self):
         self.checkqueue()
         if self.thread.is_alive():
-            self.after(wait_time_ms, self.call_periodically)
+            self.after(self.call_interval, self.call_periodically)
             return
         self.cancel_button.configure(state=Tkc.DISABLED)
         self.progressbar.configure(value=0)

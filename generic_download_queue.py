@@ -1,18 +1,18 @@
 from Queue import Queue
 import time
 import logging
-import threading
 
 
 class GenericDownloadQueue(object):
 
     DEFAULT_MAXIMUM = 100
 
-    def __init__(self, thread_creator=None):
+    def __init__(self, thread_creator=None, call_interval=50):
         if not thread_creator:
             self.thread_creator = lambda _: None
         else:
             self.thread_creator = thread_creator
+        self.call_interval = call_interval
         self.queue = Queue()
         self.thread = None
 
@@ -36,10 +36,10 @@ class GenericDownloadQueue(object):
         while self.queue.qsize():
             self.queue.get()
 
-    def call_periodically(self, wait_time_ms=50):
+    def call_periodically(self):
         self.checkqueue()
         if self.thread.is_alive():
-            time.sleep(wait_time_ms)
+            time.sleep(self.call_interval * 1.0e-3)
             self.call_periodically()
 
     def checkqueue(self):
