@@ -84,7 +84,6 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         maximum = maximum or self.DEFAULT_MAXIMUM
         value = value or 0
         status = status or "Downloading..."
-        GenericDownloadQueue.__init__(self, thread_creator=thread_creator)
 
         # Call the parent constructors.
         GenericDownloadQueue.__init__(self, thread_creator=thread_creator, call_interval=call_interval)
