@@ -8,7 +8,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime, time as dt_time, timedelta
 from lxml.html import etree, HTMLParser
 from tempfile import NamedTemporaryFile
-from total_ordering import total_ordering
+from namedlist import namedlist
 import argcomplete
 import csv
 import dateutil.parser
@@ -18,6 +18,7 @@ import os
 import re
 import requests
 import sys
+import time
 import progbar
 from generic_download_queue import GenericDownloadQueue
 from queuing_thread import QueuingThread
@@ -30,98 +31,41 @@ except ImportError:
 logging.getLogger().setLevel(logging.DEBUG)
 
 ARIA2C_OPTIONS = {"no-conf": True,
-                  "timeout": 21,
-                  "connect-timeout": 21,
-                  "lowest-speed-limit": 1024,
+                  "timeout": 5,
+                  "connect-timeout": 5,
+                  "lowest-speed-limit": 256,
                   "file-allocation": "falloc",
                   "min-split-size": 1048576,
                   "summary-interval": 3,
                   "max-connection-per-server": 2,
-                  "max-tries": 13,
+                  "max-tries": 21,
                   "max-file-not-found": 5,
                   "max-resume-failure-tries": 5,
-                  "retry-wait": 8,
+                  "retry-wait": 1,
                   "deferred-input": True,
-                  "max-concurrent-downloads": 89,
+                  "max-concurrent-downloads": 34,
                   "auto-file-renaming": False,
                   "allow-overwrite": True,
-                  "async-dns": True,
+                  # "async-dns": True,
                   "conditional-get": True,
                   "remote-time": True,
                   "http-accept-gzip": True,
                   "enable-http-pipelining": True,
-                  "enable-http-keep-alive": False,
+                  "enable-http-keep-alive": True,
                   "log-level": "notice",
                   "console-log-level": "notice",
                   "ca-certificate": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"}
 ARIA2C_OPTIONS["check-certificate"] = os.path.exists(ARIA2C_OPTIONS["ca-certificate"])
 
-
-class NamedObject(object):
-    """
-    Abstract class to represent a named and/or downloadable object.
-    """
-
-    @property
-    def name(self):
-        """
-        The name of this object.
-        """
-        raise NotImplementedError
-
-    def to_aria2_input_entry(self):
-        """
-        Generate an input file entry such that aria2c can read and download this object.
-
-        @return: The text to insert into the input file
-        @rtype: str|unicode
-        """
-        raise NotImplementedError
-
-    def apply_update(self, new_content):
-        """
-        Update this object with the information contained within C{new_content}.
-
-        :param new_content: The content to update this object with
-        @type new_content: str|unicode
-        """
-        raise NotImplementedError
-
-    def run_backup_update(self):
-        """
-        Run a "backup" update (in case the primary update failed).
-        """
-        pass
+_PypiSearchResult = namedlist("_PypiSearchResult", ["link", "weight", "summary",
+                                                    ("download_counts", []),
+                                                    ("last_update", None)])
 
 
-@total_ordering
-class PypiSearchResult(NamedObject):
+class PypiSearchResult(_PypiSearchResult):
     """
     A named object representing a search result.
     """
-
-    __slots__ = ("link", "weight", "summary", "download_counts", "last_update")
-
-    def __repr__(self):
-        repr_fmt = ("<{0.name}/{0.version}, weight={0.weight}, rate={0.download_rate:.2f}, age={0.age}, "
-                    "score={0.score:0.3f}>")
-        return repr_fmt.format(self)
-
-    def __hash__(self):
-        return hash((self.score, self.link))
-
-    def __eq__(self, other):
-        return (self.score, self.link) == (other.score, other.link)
-
-    def __lt__(self, other):
-        return (self.score, self.link) < (other.score, other.link)
-
-    def __init__(self, link, weight, summary, download_counts=None, last_update=None):
-        self.link = link
-        self.weight = weight
-        self.summary = summary
-        self.download_counts = download_counts or []
-        self.last_update = last_update or None
 
     @classmethod
     def from_dict(cls, data_dict):
@@ -141,16 +85,16 @@ class PypiSearchResult(NamedObject):
     @property
     def version(self):
         """
-        @return: The package version
-        @rtype: basestring
+        :return: The package version
+        :rtype: str
         """
         return self.link.split("/")[-1]
 
     @property
     def name(self):
         """
-        @return: The name of this named object
-        @rtype: basestring
+        :return: The name of this named object
+        :rtype: str
         """
         return self.link.split("/")[-2]
 
@@ -192,8 +136,8 @@ class PypiSearchResult(NamedObject):
         The total score of this search result, scaled by category. The weight (according to PyPI) is worth 2,
         the age is worth 3, and the download rate is worth 5.
 
-        @return: The total score for this search result
-        @rtype: float
+        :return: The total score for this search result
+        :rtype: float
         """
         return self.scaled_weight * 2.0 + self.scaled_age * 3.0e-2 + self.scaled_download_rate * 5.0e-2
 
@@ -202,13 +146,13 @@ class PypiSearchResult(NamedObject):
         Return True if this file has been recently downloaded.
 
         :param search_dir: The directory to search in
-        @type search_dir: str
+        :type search_dir: str
         :param max_days: The maximum number of days to consider "recent"
-        @type max_days: float
-        @return: True if there is a file recently downloaded, otherwise False
-        @rtype: bool
+        :type max_days: float
+        :return: True if there is a file recently downloaded, otherwise False
+        :rtype: bool
         """
-        cur_time = (datetime.utcnow() - datetime.utcfromtimestamp(0)).total_seconds()
+        cur_time = time.time()
         target_file = os.path.join(search_dir, self.name)
         if not os.path.exists(target_file):
             return False
@@ -221,9 +165,9 @@ class PypiSearchResult(NamedObject):
         From the given page content, parse and add the download statistics to this search result.
         """
         tree = etree.fromstring(page_content, HTMLParser())
-        counts = tree.xpath("//ul[@class=\"nodot\"][li[strong[starts-with(text(), \"Downloads\")]]]/li/span/text()")
+        counts = tree.xpath("//ul[@class='nodot'][li[strong[starts-with(text(), 'Downloads')]]]/li/span/text()")
         self.download_counts = [float(count) for count in counts]
-        last_update = tree.xpath("//table[@class=\"list\"]/tr[@class]/td[4]/text()")
+        last_update = tree.xpath("//table[@class='list']/tr[@class]/td[4]/text()")
         if last_update not in [None, []]:
             self.last_update = dateutil.parser.parse(last_update[0], ignoretz=True)
             return True
@@ -235,7 +179,7 @@ class PypiSearchResult(NamedObject):
         From the given page content, parse and add the latest date listed.
         """
         tree = etree.fromstring(page_content, HTMLParser())
-        xpath_arg = "//a[@href][starts-with(., \'{0}\')]".format(self.name)
+        xpath_arg = "//a[@href][starts-with(., '{0}')]".format(self.name)
         link_elems = tree.xpath(xpath_arg)
         max_date = datetime.min
         for elem in link_elems:
@@ -274,12 +218,13 @@ class PypiSearchResult(NamedObject):
         Return True if this result would be expected in the list from pip search, otherwise False.
 
         :param search_term: the specific search term to compare
-        @type search_term: basestring
+        :type search_term: str
         """
-        if self.weight == 2:
-            return search_term.lower() in " ".join([self.name.lower(), self.summary.lower()])
-        else:
-            return self.weight > 2
+        if self.weight >= 4:
+            return True
+        if self.weight in (2, 3):
+            return search_term.lower() in self.summary.lower()
+        return False
 
     def to_aria2_input_entry(self):
         """
@@ -297,10 +242,10 @@ class PypiSearchResult(NamedObject):
     @classmethod
     def from_csv(cls, csv_line, ref_date=None):
         """
-        Given a line from a CSV file, read it and return a basic PypiSearchResult object.
+        Given a line from a CSV file, read it and return a basic :class:`PypiSearchResult` object.
         """
         ref_date = ref_date or datetime.utcnow()
-        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, basestring) else csv_line
+        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, (str, unicode)) else csv_line
         link = "https://pypi.python.org/pypi/{0[0]}/{0[1]}".format(csv_parts)
         weight = int(csv_parts[2])
         rates = [float(csv_parts[3]), float(csv_parts[3]) * 7.0, float(csv_parts[3]) * 30.0]
@@ -313,23 +258,23 @@ class PypiJsonSearchResult(PypiSearchResult):
     @property
     def version(self):
         """
-        @return: The package version
-        @rtype: basestring
+        :return: The package version
+        :rtype: str
         """
         return self.link.split("/")[-2]
 
     @property
     def name(self):
         """
-        @return: The name of this named object
-        @rtype: basestring
+        :return: The name of this named object
+        :rtype: str
         """
         return self.link.split("/")[-3]
 
     @classmethod
     def from_csv(cls, csv_line, ref_date=None):
         ref_date = ref_date or datetime.utcnow()
-        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, basestring) else csv_line
+        csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, str) else csv_line
         link = "https://pypi.python.org/pypi/{0[0]}/{0[1]}/json".format(csv_parts)
         weight = int(csv_parts[2])
         rates = [float(csv_parts[3]), float(csv_parts[3]) * 7.0, float(csv_parts[3]) * 30.0]
@@ -364,7 +309,7 @@ class DownloadMapper(QueuingThread):
     def __init__(self, queue, named_objects, max_age_days, aria2c_path):
         """
         :param named_objects: The list of named objects
-        @type named_objects: [NamedObject]
+        :type named_objects: [NamedObject]
         """
         QueuingThread.__init__(self, queue)
         self.nrmap = {}
@@ -387,13 +332,11 @@ class DownloadMapper(QueuingThread):
 
     def get_proper_path(self, file_path):
         """
-        Get the "proper" format for C{file_path} by removing Cygwin-specific formatting, if it exists.
+        Get the "proper" format for :attr:`file_path` by removing Cygwin-specific formatting, if it exists.
         This is necessary because aria2c.exe won't recognize Cygwin-formatted paths if it was built with MinGW.
 
-        :param file_path: The path to convert if deemed necessary
-        @type file_path: str or unicode
-        @return: The converted file path
-        @rtype: str or unicode
+        :param str file_path: The path to convert if deemed necessary
+        :return str: The converted file path
         """
         if "cygwin" in sys.platform.lower():
             file_path = sh.cygpath("-w", file_path).stdout.strip()
@@ -430,11 +373,6 @@ class DownloadMapper(QueuingThread):
     def run(self):
         """
         Run aria2c to execute all the downloads and save their file paths.
-
-        :param max_age_days: The maximum age a file should be in order to be considered "recent" (and skipped over)
-        @type max_age_days: float
-        :param aria2c_path: The path to the aria2c(.exe) executable, or None to search for it in the PATH environment
-        @type aria2c_path: str or None
         """
         if self.paths:
             log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
@@ -473,9 +411,6 @@ class DownloadMapper(QueuingThread):
 
     @property
     def named_objects(self):
-        """
-        @rtype: NamedObject
-        """
         return self.nrmap.values()
 
     @property
@@ -485,40 +420,40 @@ class DownloadMapper(QueuingThread):
 
 def query_initial_packages(search_term):
     """
-    Perform an initial package search on PyPI with the given C{search_term}, and return a list of
-    C{PypiSearchResult} named objects.
+    Perform an initial package search on PyPI with the given :attr:`search_term`, and return a list of
+    :attr:`PypiSearchResult` named objects.
 
-    :param search_term: The initial search query
-    @type search_term: str
-    @return: The list of search results
-    @rtype: list[PypiSearchResult]
+    :param str search_term: The initial search query
+    :return: The list of search results
+    :rtype: list[PypiSearchResult]
     """
     logging.info("Querying initial packages for %s...", search_term)
     result_page = requests.get("https://pypi.python.org/pypi", params={":action": "search", "term": search_term})
     result_tree = etree.fromstring(result_page.content, HTMLParser())
     result_tree.make_links_absolute(result_page.url)
-    result_tags = result_tree.xpath("//table[@class=\"list\"]/tr[@class][td]")
+    result_tags = result_tree.xpath("//table[@class='list']/tr[@class][td]")
     results = []
     for lxml_element in result_tags:
         result_obj = PypiJsonSearchResult(link="{0}/json".format(lxml_element[0][0].get("href")),
                                           weight=int(lxml_element[1].text),
                                           summary=lxml_element[2].text)
-        results.append(result_obj)
+        if result_obj.is_pip_result(search_term):
+            results.append(result_obj)
     return results
 
 
 def search_packages(search_term, collect_stats=True, backup_search=False,
                     max_age_days=0.5, aria2c_path=None):
     """
-    Search for packages matching C{search_term}, optionally collecting stats
+    Search for packages matching :attr:`search_term`, optionally collecting stats
     and/or running backup updates for any packages whose age was not determined
     initially.
 
-    :param basestring search_term: The search term
+    :param str search_term: The search term
     :param bool collect_stats: True to collect stats, otherwise False
     :param bool backup_search: True to run backup searches, otherwise False
     :param float max_age_days: The maximum days of age files should be
-    :param basestring aria2c_path: The path to the aria2c executable, or None to look for it on PATH
+    :param str aria2c_path: The path to the aria2c executable, or None to look for it on PATH
     :return: The resulting search results
     :rtype: list[:class:`PypiSearchResult`]
     """
@@ -558,7 +493,7 @@ class OutputFile(object):
 
     @property
     def file_name(self):
-        return "{0.search_term}.csv".format(self)
+        return "{0}.csv".format(self.search_term)
 
     @property
     def path(self):
@@ -576,12 +511,12 @@ class OutputFile(object):
     @property
     def age(self):
         age_td = datetime.utcnow() - self.ref_date
-        return age_td.total_seconds() / 86400.0
+        return age_td.days + age_td.seconds / 86.4e3
 
 
 def main(args):
     """
-    @type args: list
+    :type args: list
     """
     parser = ArgumentParser(description="Search for python packages using better metrics",
                             formatter_class=ArgumentDefaultsHelpFormatter)
