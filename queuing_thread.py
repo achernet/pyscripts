@@ -66,4 +66,3 @@ class QueuingThread(Thread):
             self.running_command.process.kill()
             self.running_command.process.terminate()
             self.running_command = None
-

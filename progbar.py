@@ -68,7 +68,8 @@ class GenericProgressBar(ttk.Frame, GenericDownloadQueue):
         else:
             return "{0:.1f}%".format(self.value * 100.0 / self.maximum)
 
-    def __init__(self, master=None, title=None, maximum=None, value=None, status=None, thread_creator=None, call_interval=50):
+    def __init__(self, master=None, title=None, maximum=None, value=None,
+                 status=None, thread_creator=None, call_interval=50):
         """
         :param master: The master top-level form to place this progress bar in (or None to make a new one)
         :type master: :class:`ttk.Frame`

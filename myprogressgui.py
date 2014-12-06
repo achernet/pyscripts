@@ -189,7 +189,6 @@ class MyProgressGui(tk.Tk):
                 logging.exception("Error in checkqueue(): %s", e)
 
 
-
 class ThreadedClient(Thread):
 
     def __init__(self, queue):
@@ -253,6 +252,7 @@ class CommandThread(Thread):
             self.running_command.process.kill()
             self.running_command.process.terminate()
             self.running_command = None
+
 
 def main(args):
     app = MyProgressGui(args[0] if args else "")

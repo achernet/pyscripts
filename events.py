@@ -17,6 +17,7 @@ def key(event):
 
 label.bind_all("<Key>", key)
 
+
 def do_mouse(event_name):
 
     def mouse_binding(event):
