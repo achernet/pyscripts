@@ -157,6 +157,8 @@ class GuiLogger(logging.Handler):
 
 class MyGui(object):
 
+    TITLE = "Logging GUI"
+
     def __init__(self, root=None):
         self.root = root or tk.Tk()
         self.root.title(self.TITLE)
