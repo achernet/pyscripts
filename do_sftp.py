@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 from argparse import ArgumentParser
-import sh
+try:
+    import sh
+    SUFFIX = ""
+except ImportError:
+    import pbs as sh
+    SUFFIX = ".exe"
 import os
 import sys
 
@@ -46,14 +51,14 @@ def parse_args(args):
     ap.add_argument("-p", "--password", help="The remote user password")
     ap.add_argument("-r", "--remote", help="The remote site, in the form of host:port", type=parse_site)
     parser_ns = ap.parse_args(args)
-    parser_ns.url = "{0.user}@{1}".format(parser_ns, parser_ns.remote[-1])
+    parser_ns.url = "{0}@{1}".format(parser_ns.user, parser_ns.remote[-1])
     return parser_ns
 
 
 def main(args):
     parser_ns = parse_args(args)
     sender = RemoteSender(parser_ns.source, parser_ns.dest, parser_ns.password)
-    command = sh.sftp.bake(parser_ns.remote[:-1], parser_ns.url)
+    command = sh.Command('sftp' + SUFFIX).bake(parser_ns.remote[:-1], parser_ns.url)
     process = command(_out=sender.ssh_interact, _out_bufsize=0, _tty_in=True)
     process.wait()
 

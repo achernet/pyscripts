@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 from argparse import ArgumentParser
-import sh
+try:
+    import sh
+    SUFFIX = ""
+except ImportError:
+    import pbs as sh
+    SUFFIX = ".exe"
 import os
 import logging
 import re
@@ -99,8 +104,8 @@ def parse_args(args):
             return [":".join(site_parts)]
 
     ap = ArgumentParser("Proxy a download via SSH from a given server")
-    #~ ap.add_argument("-s", "--source", help="The source (local) path")
-    #~ ap.add_argument("-d", "--dest", help="The destination (remote) path")
+    # ap.add_argument("-s", "--source", help="The source (local) path")
+    # ap.add_argument("-d", "--dest", help="The destination (remote) path")
     ap.add_argument("-u", "--user", help="The remote user name")
     ap.add_argument("-p", "--password", help="The remote user password")
     ap.add_argument("-r", "--remote", help="The remote site, in the form of host:port", type=parse_site)
@@ -110,7 +115,7 @@ def parse_args(args):
     ap.add_argument("-S", "--skip-ssh", default=False, action="store_true",
                     help="Set this to true if the remote server already has the file")
     parser_ns = ap.parse_args(args)
-    parser_ns.url = "{0.user}@{1}".format(parser_ns, parser_ns.remote[-1])
+    parser_ns.url = "{0}@{1}".format(parser_ns.user, parser_ns.remote[-1])
     return parser_ns
 
 
@@ -118,7 +123,9 @@ def main(args):
     parser_ns = parse_args(args)
     sender = RemoteSender(parser_ns.password, parser_ns.command, parser_ns.link)
     ssh_arg = "\"{0.command} {0.link!r}\"".format(parser_ns)
-    command = sh.ssh.bake(parser_ns.remote[:-1], "--user-agent", "Mozilla/5.0", parser_ns.url)
+    command = sh.Command("ssh" + SUFFIX).bake(parser_ns.remote[:-1],
+                                              "--user-agent", "Mozilla/5.0",
+                                              parser_ns.url)
     logging.info("Running command: %s", command)
     ssh_proc = command(_out=sender.ssh_interact, _out_bufsize=0, _tty_in=True)
     ssh_proc.wait()
@@ -128,7 +135,9 @@ def main(args):
         arg_index = scp_remote_args.index("-p")
         scp_remote_args[arg_index] = "-P"
     scp_remote_path = repr(osp.split(urlparse.urlsplit(parser_ns.link).path)[-1])
-    scp_command = sh.scp.bake(scp_remote_args, ":".join([parser_ns.url, scp_remote_path]), scp_remote_path)
+    scp_command = sh.Command("scp" + SUFFIX).bake(scp_remote_args,
+                                                  ":".join([parser_ns.url, scp_remote_path]),
+                                                  scp_remote_path)
     scp_proc = scp_command(_out=sender.ssh_interact, _out_bufsize=0, _tty_in=True)
     scp_proc.wait()
 
