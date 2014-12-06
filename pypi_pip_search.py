@@ -373,6 +373,11 @@ class DownloadMapper(QueuingThread):
     def run(self):
         """
         Run aria2c to execute all the downloads and save their file paths.
+
+        :param max_age_days: The maximum age a file should be in order to be considered "recent" (and skipped over)
+        :type max_age_days: float
+        :param aria2c_path: The path to the aria2c(.exe) executable, or None to search for it in the PATH environment
+        :type aria2c_path: str or None
         """
         if self.paths:
             log_fmt = "Download mapper has already run or is currently running! (%d paths came back)"
@@ -411,6 +416,9 @@ class DownloadMapper(QueuingThread):
 
     @property
     def named_objects(self):
+        """
+        :rtype: NamedObject
+        """
         return self.nrmap.values()
 
     @property
@@ -486,7 +494,7 @@ class OutputFile(object):
         self.search_term = search_term
 
     def __repr__(self):
-        return "{0.__class__.__name__}({0.search_term})".format(self)
+        return '{0}({1})'.format(self.__class__.__name__, self.search_term)
 
     def __str__(self):
         return repr(self)
@@ -511,7 +519,8 @@ class OutputFile(object):
     @property
     def age(self):
         age_td = datetime.utcnow() - self.ref_date
-        return age_td.days + age_td.seconds / 86.4e3
+        total_secs = (age_td.days * 86.4e3) + age_td.seconds + (age_td.microseconds * 1.0e-6)
+        return total_secs / 86.4e3
 
 
 def main(args):
