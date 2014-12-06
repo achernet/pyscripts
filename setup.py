@@ -10,27 +10,12 @@ except ImportError:
 
 setup(
     name='pyscripts',
-    version="0.1.1-dev",
-    description='',
-    author='',
-    author_email='',
-    url='',
-    install_requires=[
-        "Scripy>=0.9.3",
-        "requests>=2.1.0",
-        "SQLAlchemy>=0.9.1",
-        "psycopg2>=2.5.2",
-        "simplejson>=3.3.2",
-        "jellyfish>=0.2.1",
-        "sh>=1.0.9",
-        "dateutils>=0.6.6",
-        "configobj>=4.7.2",
-        "lxml>=3.2.3",
-        "blist>=1.3.4",
-        "flexidate>=1.0.0",
-        "magicdate>=0.1.3",
-    ],
-    dependency_links=["http://github.com/achernet/jellyfish/tarball/master#egg=jellyfish-0.2.1"],
+    version="0.1.2-dev",
+    description='A convenient Git repository for several WIP python scripts',
+    author='Alexander Chernetz',
+    author_email='andy80586@gmail.com',
+    url='https://github.com/achernet/pyscripts',
+    install_requires=[line for line in open('requirements.txt', 'rb')],
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
     test_suite='nose.collector',
@@ -45,10 +30,5 @@ setup(
         "epydoc>=3.0.1",
         "unittest2>=0.5.1"
     ],
-    # scripts=['jobparser/bin/criteria.py'],
-    zip_safe=True,
-    # entry_points="""
-    # [jobparser.bin.criteria]
-    # main = jobparser.bin.criteria:main
-    # """,
+    zip_safe=False
 )
