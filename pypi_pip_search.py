@@ -71,7 +71,7 @@ class PypiSearchResult(_PypiSearchResult):
     def from_dict(cls, data_dict):
         return PypiSearchResult(link=data_dict["link"],
                                 weight=data_dict["weight"],
-                                summary=data_dict["summary"],
+                                summary=data_dict["summary"] or "",
                                 download_counts=data_dict.get("download_counts"),
                                 last_update=data_dict.get("last_update"))
 
@@ -343,11 +343,18 @@ class DownloadMapper(QueuingThread):
             print file_path
         return file_path
 
+    def find_aria2c(self):
+        for path in (self.aria2c_path, 'aria2c', 'aria2c.exe'):
+            if path is None:
+                continue
+            next_path = sh.which(path)
+            if next_path:
+                return next_path
+        logging.error('aria2c is missing from the current configuration!')
+        return None
+
     def build_command(self):
-        aria2c_path = self.aria2c_path or sh.resolve_program("aria2c") or sh.resolve_program("aria2c.exe")
-        if aria2c_path is None:
-            logging.error("aria2c is missing from the current configuration!")
-            return
+        aria2c_path = self.find_aria2c()
         aria2_cmd = sh.Command(aria2c_path)
 
         # Run and observe the above aria2c executable, reporting download progress to the appropriate logger.
