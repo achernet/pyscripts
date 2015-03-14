@@ -36,17 +36,16 @@ class WinPythonLibFinder(object):
 
     def get_matching_links(self, py_version=None, py_arch=None):
         py_version = py_version or '{0}.{1}'.format(*sys.version_info)
-        py_arch = py_arch or len('{0:x}'.format(sys.maxint)) * 4
+        py_arch = str(py_arch or len('{0:x}'.format(sys.maxint)) * 4)
         other_arch = {"64": "32", "32": "64"}[py_arch]
         link_dict = {}
         for match in self.element.xpath(LINK_XPATH):
-            title = match.get("title")
-            if any(("Python {0}".format(py_version) not in title,
-                    "{0} bit".format(py_arch) not in title,
-                    "{0} bit".format(other_arch) in title)):
+            title = match.text.replace(u"\u2011", "-")
+            if any((py_version.replace('.', '') not in title,
+                    "{0}.".format(py_arch) not in title,
+                    "{0}.".format(other_arch) in title)):
                 continue
-            file_name = match.text.replace(u"\u2011", "-")
-            pkg_name_match = PKG_NAME_RGX.search(file_name)
+            pkg_name_match = PKG_NAME_RGX.search(title)
             if pkg_name_match is None:
                 continue
             package_name = pkg_name_match.group(1)
