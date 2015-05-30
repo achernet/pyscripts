@@ -451,7 +451,7 @@ def query_initial_packages(search_term):
     for lxml_element in result_tags:
         result_obj = PypiJsonSearchResult(link="{0}/json".format(lxml_element[0][0].get("href")),
                                           weight=int(lxml_element[1].text),
-                                          summary=lxml_element[2].text)
+                                          summary=lxml_element[2].text or '')
         if result_obj.is_pip_result(search_term):
             results.append(result_obj)
     return results
