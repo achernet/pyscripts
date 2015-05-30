@@ -76,7 +76,7 @@ class WinPythonLibFinder(object):
         package_url = matching_links[package_name]
         package_filename = os.path.split(urlparse.urlparse(package_url).path)[-1]
         dest_path = os.path.abspath(os.path.join(os.path.curdir, package_filename))
-        print "Downloading package {0!r} to {1}".format(package_name, dest_path)
+        print "Downloading package {0!r} to {1}\n\tURL:{2!r}".format(package_name, dest_path, package_url)
         request_args = {"url": package_url, "headers": {"User-Agent": "Mozilla/5.0"}}
         if no_proxies:
             request_args["proxies"] = {"http": None, "https": None, "ftp": None}
