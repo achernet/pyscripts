@@ -41,11 +41,12 @@ nosetests.xml
 # Translations
 *.mo
 
-# Mr Developer
+# IDE-generated files
 .mr.developer.cfg
 .project
 .pydevproject
 .idea/
+.ropeproject/
 
 # Logs
 *.log
@@ -54,4 +55,3 @@ nosetests.xml
 *~
 *.bak
 *.sw.
-
