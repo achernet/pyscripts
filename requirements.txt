@@ -8,3 +8,4 @@ argcomplete >= 0.8.3
 netaddr >= 0.7.12
 contextdecorator >= 0.10.0
 total-ordering >= 0.1.0
+retrying >= 1.2.3
