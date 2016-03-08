@@ -47,6 +47,7 @@ nosetests.xml
 .pydevproject
 .idea/
 .ropeproject/
+*.iml
 
 # Logs
 *.log
