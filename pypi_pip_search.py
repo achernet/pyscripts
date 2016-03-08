@@ -5,20 +5,23 @@ Main module for running "new and improved" python package searches with better m
 
 """
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from datetime import datetime, time as dt_time, timedelta
-from lxml.html import etree, HTMLParser
-from tempfile import NamedTemporaryFile
-from namedlist import namedlist
-import argcomplete
 import csv
-import dateutil.parser
+from datetime import datetime, time as dt_time, timedelta
 import json
 import logging
 import os
 import re
-import requests
 import sys
+from tempfile import NamedTemporaryFile
 import time
+import urlparse
+from lxml.html import etree, HTMLParser
+from namedlist import namedlist
+from path import Path
+import argcomplete
+import dateutil.parser
+import requests
+
 import progbar
 from generic_download_queue import GenericDownloadQueue
 from queuing_thread import QueuingThread
@@ -230,7 +233,10 @@ class PypiSearchResult(_PypiSearchResult):
         """
         Return this result formatted as an aria2c input file entry.
         """
-        return "{0.link}\n out={0.name}\n".format(self)
+        link_obj = urlparse.urlparse(self.link)._asdict()
+        versionless_path = Path(link_obj.pop('path')).dirname().dirname().joinpath('json')
+        new_link_obj = urlparse.ParseResult(path=versionless_path, **link_obj)
+        return '{0}\n out={1}\n'.format(new_link_obj.geturl(), self.name)
 
     def to_csv(self):
         """
@@ -284,7 +290,7 @@ class PypiJsonSearchResult(PypiSearchResult):
     def apply_update(self, new_content):
         try:
             json_dict = json.loads(new_content)
-        except ValueError as e:
+        except ValueError:
             logging.exception("Error parsing JSON content update:\n%r", new_content)
             self.download_counts = [-1.0, -1.0, -1.0]
             self.last_update = None
