@@ -283,7 +283,7 @@ class PypiJsonSearchResult(PypiSearchResult):
     def from_csv(cls, csv_line, ref_date=None):
         ref_date = ref_date or datetime.utcnow()
         csv_parts = list(csv.reader([csv_line]))[0] if isinstance(csv_line, str) else csv_line
-        link = "https://pypi.python.org/pypi/{0[0]}/{0[1]}/json".format(csv_parts)
+        link = "https://pypi.python.org/pypi/{0[0]}/json".format(csv_parts)
         weight = int(csv_parts[2])
         rates = [float(csv_parts[3]), float(csv_parts[3]) * 7.0, float(csv_parts[3]) * 30.0]
         start_date = ref_date - timedelta(days=int(csv_parts[4]))
