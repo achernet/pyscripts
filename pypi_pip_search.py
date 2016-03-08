@@ -31,7 +31,9 @@ try:
 except ImportError:
     import pbs as sh  # On Windows, pbs takes the place of sh
 
-logging.getLogger().setLevel(logging.DEBUG)
+if not logging.root.handlers:
+    logging.basicConfig(format='%(asctime)s-{0}'.format(logging.BASIC_FORMAT),
+                        level=logging.INFO)
 
 ARIA2C_OPTIONS = {"no-conf": True,
                   "timeout": 5,
